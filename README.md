@@ -51,6 +51,5 @@ Jika Anda ingin menjalankan layanan secara lokal, bacalah panduannya di:
 
 *Panduan tersebut mencakup instalasi requirements, eksekusi ketiga backend microservice di atas, serta pengoperasian proxy UI Web-nya.*
 
-> **Tim Wardiere, Inc.** 
 > * Oryza Qiara Ramadhani - 084
 > * Maritza Adelia Sucipto - 111
