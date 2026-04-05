@@ -2,11 +2,15 @@ import grpc
 from concurrent import futures
 import time
 import queue
+import threading
 
 import chat_pb2
 import chat_pb2_grpc
 
-clients = []
+# room -> { username: queue }
+clients = {}
+lock = threading.Lock()
+
 
 class ChatService(chat_pb2_grpc.ChatServiceServicer):
 
@@ -14,19 +18,33 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
         print("Client connected")
 
         q = queue.Queue()
-        clients.append(q)
+        username = None
+        user_room = None
 
         try:
-            # thread untuk menerima pesan dari client ini
             def receive_messages():
+                nonlocal username, user_room
+
                 for message in request_iterator:
-                    print(f"{message.username}: {message.message}")
+                    username = message.username
+                    user_room = message.room
 
-                    # broadcast ke semua client
-                    for client_queue in clients:
-                        client_queue.put(message)
+                    # join room otomatis
+                    with lock:
+                        if user_room not in clients:
+                            clients[user_room] = {}
 
-            import threading
+                        if username not in clients[user_room]:
+                            clients[user_room][username] = q
+                            print(f"{username} joined {user_room}")
+
+                    # broadcast ke room yg sama
+                    with lock:
+                        for user, client_queue in clients[user_room].items():
+                            # skip sender biar gak double
+                            if user != username:
+                                client_queue.put(message)
+
             threading.Thread(target=receive_messages, daemon=True).start()
 
             # kirim pesan ke client ini
@@ -34,9 +52,20 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
                 message = q.get()
                 yield message
 
-        except:
-            print("Client disconnected")
-            clients.remove(q)
+        except Exception as e:
+            print("Client error:", e)
+
+        finally:
+            # cleanup
+            with lock:
+                if user_room in clients and username in clients[user_room]:
+                    del clients[user_room][username]
+                    print(f"{username} left {user_room}")
+
+                # hapus room kalau kosong
+                if user_room in clients and not clients[user_room]:
+                    del clients[user_room]
+                    print(f"{user_room} deleted (empty)")
 
 
 def serve():

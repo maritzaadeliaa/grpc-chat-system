@@ -35,6 +35,7 @@ def run():
     chat_channel = grpc.insecure_channel('localhost:50051')
     chat_stub = chat_pb2_grpc.ChatServiceStub(chat_channel)
 
+    # ✅ generator untuk kirim pesan
     def generate_messages():
         while True:
             msg = input(">> ")
@@ -44,10 +45,15 @@ def run():
                 message=msg
             )
 
+    # streaming
     responses = chat_stub.ChatStream(generate_messages())
 
-    for response in responses:
-        print(f"{response.username}: {response.message}")
+    # receive
+    try:
+        for response in responses:
+            print(f"{response.username}: {response.message}")
+    except:
+        print("Disconnected from server")
 
 
 if __name__ == '__main__':
