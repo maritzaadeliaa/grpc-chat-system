@@ -28,6 +28,15 @@ class UserService(user_pb2_grpc.UserServiceServicer):
             message=f"{username} logged in"
         )
 
+    def Logout(self, request, context):
+        username = request.username
+        if username in active_users:
+            active_users.remove(username)
+        return user_pb2.UserResponse(
+            status="SUCCESS",
+            message=f"{username} logged out"
+        )
+
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

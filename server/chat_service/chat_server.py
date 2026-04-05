@@ -34,9 +34,9 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
                         if user_room not in clients:
                             clients[user_room] = {}
 
-                        if username not in clients[user_room]:
-                            clients[user_room][username] = q
-                            print(f"{username} joined {user_room}")
+                        # Selalu update q ke request stream yang terbaru
+                        clients[user_room][username] = q
+                        print(f"{username} joined {user_room}")
 
                     # broadcast ke room yg sama
                     with lock:
@@ -47,10 +47,13 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
 
             threading.Thread(target=receive_messages, daemon=True).start()
 
-            # kirim pesan ke client ini
-            while True:
-                message = q.get()
-                yield message
+            # kirim pesan ke client ini dengan metode cek status koneksi
+            while context.is_active():
+                try:
+                    message = q.get(timeout=1.0)
+                    yield message
+                except queue.Empty:
+                    continue
 
         except Exception as e:
             print("Client error:", e)
@@ -59,8 +62,10 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
             # cleanup
             with lock:
                 if user_room in clients and username in clients[user_room]:
-                    del clients[user_room][username]
-                    print(f"{username} left {user_room}")
+                    # Hanya hapus jika queue-nya masih punya stream ini (bukan ditiban stream baru)
+                    if clients[user_room][username] == q:
+                        del clients[user_room][username]
+                        print(f"{username} left {user_room}")
 
                 # hapus room kalau kosong
                 if user_room in clients and not clients[user_room]:

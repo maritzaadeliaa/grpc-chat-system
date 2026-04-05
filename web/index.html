@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gRPC Realtime Chat</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+    <div class="blob-c">
+        <div class="blob"></div>
+        <div class="blob blur"></div>
+    </div>
+
+    <!-- Login Container -->
+    <div class="container glass" id="login-container">
+        <div class="header">
+            <h2>Welcome Back</h2>
+            <p>Enter your details to join the chat</p>
+        </div>
+        <form id="login-form">
+            <div id="login-warning" style="display: none; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; text-align: center; border: 1px solid rgba(239, 68, 68, 0.3);">
+            </div>
+            <div class="input-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="e.g. John Doe" required autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label for="room">Room ID</label>
+                <input type="text" id="room" placeholder="e.g. general" required autocomplete="off">
+            </div>
+            <button type="submit" class="btn primary-btn">Join Space</button>
+        </form>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="container chat-container glass" id="chat-container" style="display: none;">
+        <div class="chat-header">
+            <div class="room-info">
+                <h3><span class="pulse-dot"></span> <span id="current-room">Room 1</span></h3>
+                <p id="current-user">User</p>
+            </div>
+            <button class="btn ghost-btn" id="leave-btn">Leave</button>
+        </div>
+        <div class="chat-messages" id="messages-box">
+            <!-- Messages go here -->
+            <div class="message system">
+                <div class="text">Connecting to the server...</div>
+            </div>
+        </div>
+        <form class="chat-input-area" id="chat-form">
+            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+            <button type="submit" class="btn circle-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </form>
+    </div>
+
+    <script src="app.js?v=3"></script>
+</body>
+</html>

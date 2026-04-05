@@ -4,6 +4,7 @@ package user;
 
 service UserService {
   rpc Login(UserRequest) returns (UserResponse);
+  rpc Logout(UserRequest) returns (UserResponse);
 }
 
 message UserRequest {
