@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package room;
+
+service RoomService {
+  rpc JoinRoom(RoomRequest) returns (RoomResponse);
+}
+
+message RoomRequest {
+  string username = 1;
+  string room = 2;
+}
+
+message RoomResponse {
+  string status = 1;
+  string message = 2;
+}
