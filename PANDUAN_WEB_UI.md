@@ -1,10 +1,10 @@
-# 📖 Panduan Menjalankan Web Chat gRPC
+# Panduan Menjalankan Web Chat gRPC
 
-Dokumen ini berisi panduan langkah demi langkah untuk menarik kode terbaru dari branch **main** dan menjalankan **Web UI Realtime Chat** berbasis gRPC Bidirectional Streaming + FastAPI WebSocket Proxy.
+Dokumen ini berisi panduan lengkap untuk menjalankan **Web UI Realtime Chat** berbasis gRPC Bidirectional Streaming + FastAPI WebSocket Proxy.
 
 ---
 
-## 🗺️ Gambaran Arsitektur
+## Gambaran Arsitektur
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -13,7 +13,7 @@ Dokumen ini berisi panduan langkah demi langkah untuk menarik kode terbaru dari 
 └─────────────────────┬────────────────────────────────┘
                       │ WebSocket (ws://)
           ┌───────────▼──────────────┐
-          │   Web Proxy — FastAPI    │  ← Port 8000
+          │   Web Proxy — FastAPI    │  <- Port 8000
           │   (web_proxy.py)         │
           └──┬──────────┬────────────┘
              │ gRPC     │ gRPC      │ gRPC
@@ -28,17 +28,17 @@ Setiap komponen berjalan sebagai **proses terpisah**. Web Proxy bertugas menjemb
 
 ---
 
-## ✅ Prasyarat
+## Prasyarat
 
 Pastikan sudah terinstall di komputer Anda:
 
-- **Python 3.8+** → cek dengan `python --version`
-- **pip** → cek dengan `pip --version`
-- **Git** → cek dengan `git --version`
+- **Python 3.8+** — cek dengan `python --version`
+- **pip** — cek dengan `pip --version`
+- **Git** — cek dengan `git --version`
 
 ---
 
-## 1. 📥 Tarik (Pull) Kode Terbaru
+## 1. Tarik (Pull) Kode Terbaru
 
 Buka terminal di dalam folder project, lalu jalankan:
 
@@ -48,11 +48,11 @@ git checkout main
 git pull origin main
 ```
 
-> Jika kamu bekerja di branch lain (misal `caca`), ganti `main` dengan nama branch yang sesuai.
+> Jika kamu bekerja di branch lain, ganti `main` dengan nama branch yang sesuai.
 
 ---
 
-## 2. 📦 Install Dependensi
+## 2. Install Dependensi
 
 Instal semua dependensi Python yang dibutuhkan:
 
@@ -65,14 +65,14 @@ Paket yang akan diinstall antara lain:
 | Paket | Fungsi |
 |---|---|
 | `grpcio` | Core library gRPC untuk Python |
-| `grpcio-tools` | Compiler file `.proto` → `.py` |
+| `grpcio-tools` | Compiler file `.proto` ke `.py` |
 | `fastapi` | Web framework untuk proxy server |
 | `uvicorn[standard]` | ASGI server untuk menjalankan FastAPI |
 | `websockets` | Dukungan WebSocket di server |
 
 ---
 
-## 3. 🔨 Compile File Protobuf (Jika Diperlukan)
+## 3. Compile File Protobuf (Jika Diperlukan)
 
 > **Lewati langkah ini** jika file `chat_pb2.py`, `user_pb2.py`, `room_pb2.py` sudah ada di folder root project.
 
@@ -83,37 +83,42 @@ python -m grpc_tools.protoc -I./proto --python_out=. --grpc_python_out=. ./proto
 ```
 
 Pastikan file-file berikut muncul di folder root:
+
 ```
-chat_pb2.py  chat_pb2_grpc.py
-room_pb2.py  room_pb2_grpc.py
-user_pb2.py  user_pb2_grpc.py
+chat_pb2.py      chat_pb2_grpc.py
+room_pb2.py      room_pb2_grpc.py
+user_pb2.py      user_pb2_grpc.py
 ```
 
 ---
 
-## 4. 🚀 Cara Menjalankan
+## 4. Cara Menjalankan
 
-### 🟢 Cara 1: Otomatis (Semua Sekaligus) — Direkomendasikan
+### Cara 1: Otomatis — Semua Sekaligus (Direkomendasikan)
 
-Cukup jalankan satu perintah ini dari root folder project:
+Cukup jalankan **satu perintah** ini dari root folder project:
 
 ```bash
 python run_all.py
 ```
 
-Script ini akan otomatis menjalankan **keempat service** sekaligus dan menampilkan output berwarna dari masing-masing service di terminal yang sama.
+Script ini akan otomatis menjalankan **keempat service** sekaligus dan menampilkan log berwarna dari masing-masing service di terminal yang sama.
 
 ```
-✅ User Service   started (port 50052)
-✅ Room Service   started (port 50053)
-✅ Chat Service   started (port 50051)
-✅ Web Proxy      started (port 8000)
-─────────────────────────────────────────────
-  🌐 Web UI  : http://localhost:8000
-  📡 Chat    : gRPC @ localhost:50051
-  👤 User    : gRPC @ localhost:50052
-  🏠 Room    : gRPC @ localhost:50053
-─────────────────────────────────────────────
+=======================================================
+  gRPC Chat System - Starting All Services
+=======================================================
+
+[OK] User Service started (port 50052)
+[OK] Room Service started (port 50053)
+[OK] Chat Service started (port 50051)
+[OK] Web Proxy      started (port 8000)
+-------------------------------------------------------
+  Web UI  : http://localhost:8000
+  Chat    : gRPC @ localhost:50051
+  User    : gRPC @ localhost:50052
+  Room    : gRPC @ localhost:50053
+-------------------------------------------------------
   Tekan Ctrl+C untuk menghentikan semua service.
 ```
 
@@ -121,9 +126,9 @@ Tekan **Ctrl+C** untuk menghentikan semua service sekaligus.
 
 ---
 
-### 🔵 Cara 2: Manual (4 Terminal Terpisah)
+### Cara 2: Manual — 4 Terminal Terpisah
 
-Buka **4 terminal** (bisa pakai fitur Split Terminal di VS Code) dan jalankan perintah berikut masing-masing:
+Buka **4 terminal** (bisa pakai fitur Split Terminal di VS Code) dan jalankan masing-masing:
 
 **Terminal 1 — Chat Service** (Port 50051):
 ```bash
@@ -145,55 +150,49 @@ python -m server.room_service.room_server
 python web_proxy.py
 ```
 
-Pastikan tiap terminal menampilkan output tanda server berjalan, contohnya:
-```
-✅ Chat Server running on port 50051
-✅ User Server running on port 50052
-✅ Room Server running on port 50053
-🚀 gRPC Chat Web Proxy starting on http://localhost:8000
-```
+Pastikan tiap terminal menampilkan output bahwa server sudah berjalan.
 
 ---
 
-## 5. 🌐 Buka Aplikasi di Browser
+## 5. Buka Aplikasi di Browser
 
-Setelah semua service berjalan, buka browser kamu (Chrome / Firefox / Edge) dan ketikkan alamat berikut:
+Setelah semua service berjalan, buka browser (Chrome / Firefox / Edge) dan akses:
 
-### 👉 **[http://localhost:8000](http://localhost:8000)**
+### http://localhost:8000
 
 Tampilan aplikasi chat berdesain gelap (dark mode) akan langsung muncul!
 
 ---
 
-## 6. 💬 Cara Menggunakan Aplikasi
+## 6. Cara Menggunakan Aplikasi
 
 ### Login & Masuk Room
 
 1. Masukkan **Username** yang unik (tidak boleh sama dengan user lain yang sedang online)
 2. Masukkan **Nama Room** yang ingin dimasuki (bebas, contoh: `room-it`, `umum`, `diskusi`)
-3. Klik tombol **"Masuk ke Chat →"**
+3. Klik tombol **"Masuk ke Chat"**
 
 ### Chatting
 
 - Ketik pesan di kolom input bawah, lalu tekan **Enter** atau klik tombol kirim
 - Tekan **Shift+Enter** untuk pindah baris tanpa mengirim
-- Pesan dari dirimu muncul di **kanan** (ungu)
+- Pesan dari dirimu muncul di **kanan** (warna ungu)
 - Pesan dari orang lain muncul di **kiri** (abu-abu)
 
 ### Multi-Room
 
-- Klik **"＋ Join"** di sidebar kiri untuk masuk ke room tambahan
+- Klik **"+ Join"** di sidebar kiri untuk masuk ke room tambahan
 - Klik nama room di sidebar untuk berpindah antar room
 - Angka merah di samping nama room menunjukkan **pesan belum dibaca**
 
 ### Keluar
 
 - Klik **"Keluar Room"** di pojok kanan atas untuk keluar dari room aktif
-- Klik **"🚪 Keluar"** di sidebar bawah untuk logout sepenuhnya
+- Klik **"Keluar"** di sidebar bawah untuk logout sepenuhnya
 
 ---
 
-## 7. 🖥️ Cara Menggunakan CLI Client (Opsional)
+## 7. Cara Menggunakan CLI Client (Opsional)
 
 Selain Web UI, tersedia juga **terminal client** yang bisa digunakan bersamaan:
 
@@ -207,7 +206,7 @@ Ketik `/keluar` untuk keluar dari CLI client.
 
 ---
 
-## 💡 Tips & Trik
+## Tips & Trik
 
 > **Tip 1 — Test Multi-User:** Buka **dua tab browser** (atau dua browser berbeda), login dengan username berbeda ke room yang sama. Coba ngobrol antara keduanya untuk merasakan efek real-time!
 
@@ -215,11 +214,11 @@ Ketik `/keluar` untuk keluar dari CLI client.
 
 > **Tip 3 — Mix CLI + Web:** Jalankan CLI client di terminal dan buka Web UI di browser, login ke room yang sama, lalu chat antara keduanya!
 
-> **Tip 4 — Lihat Log Server:** Saat menjalankan dengan `python run_all.py`, amati log berwarna di terminal — kamu bisa melihat setiap user yang join/leave dan setiap pesan yang di-broadcast secara real-time.
+> **Tip 4 — Lihat Log Server:** Saat menjalankan `python run_all.py`, amati log berwarna di terminal untuk melihat setiap user yang join/leave dan setiap pesan yang dibroadcast secara real-time.
 
 ---
 
-## ❗ Troubleshooting
+## Troubleshooting
 
 ### `ModuleNotFoundError: No module named 'grpcio'`
 ```bash
@@ -227,10 +226,10 @@ pip install -r requirements.txt
 ```
 
 ### `Address already in use` / Port sudah terpakai
-Kemungkinan ada instance server yang masih berjalan. Hentikan semua proses Python:
+Ada instance server yang masih berjalan. Hentikan semua proses Python dahulu:
 ```bash
-# Windows
-taskkill /F /IM python.exe
+# Windows (PowerShell)
+Get-Process python* | Stop-Process -Force
 ```
 Lalu jalankan ulang.
 
@@ -244,11 +243,11 @@ python -m grpc_tools.protoc -I./proto --python_out=. --grpc_python_out=. ./proto
 Pastikan **semua 4 proses** sudah berjalan (Chat, User, Room Service + Web Proxy). Cek terminal masing-masing untuk error.
 
 ### Username sudah dipakai
-Setiap username harus unik saat online. Tunggu beberapa saat (server akan reset saat di-restart) atau gunakan username lain.
+Setiap username harus unik saat online. Gunakan username lain atau restart server untuk me-reset semua sesi.
 
 ---
 
-## 📁 Struktur Proyek
+## Struktur Proyek
 
 ```
 grpc-chat-system/
@@ -266,14 +265,15 @@ grpc-chat-system/
 ├── client/
 │   └── client.py               # CLI Client (threading)
 ├── web/
-│   └── index.html              # Web UI (dark mode, glassmorphism)
-├── web_proxy.py                # FastAPI proxy: HTTP/WebSocket ↔ gRPC
-├── run_all.py                  # 🚀 Launcher semua service sekaligus
+│   └── index.html              # Web UI (dark mode)
+├── web_proxy.py                # FastAPI proxy: HTTP/WebSocket <-> gRPC
+├── run_all.py                  # Launcher semua service sekaligus
 ├── requirements.txt            # Daftar dependensi Python
-├── PANDUAN_WEB_UI.md           # 📖 Dokumen ini
-└── README.md                   # Ringkasan singkat
+├── PANDUAN_WEB_UI.md           # Dokumen ini
+└── README.md                   # Deskripsi project
 ```
 
 ---
 
-*Dibuat untuk tugas mata kuliah Integrasi Sistem Informasi — Semester 4*
+*Dibuat untuk tugas mata kuliah Integrasi Sistem Informasi — Semester 4*  
+*Oryza Qiara Ramadhani - 084 | Maritza Adelia Sucipto - 111*
