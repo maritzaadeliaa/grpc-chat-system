@@ -39,6 +39,16 @@ class RoomServiceStub(object):
                 request_serializer=room__pb2.RoomRequest.SerializeToString,
                 response_deserializer=room__pb2.RoomResponse.FromString,
                 _registered_method=True)
+        self.LeaveRoom = channel.unary_unary(
+                '/room.RoomService/LeaveRoom',
+                request_serializer=room__pb2.RoomRequest.SerializeToString,
+                response_deserializer=room__pb2.RoomResponse.FromString,
+                _registered_method=True)
+        self.GetRoomMembers = channel.unary_unary(
+                '/room.RoomService/GetRoomMembers',
+                request_serializer=room__pb2.RoomRequest.SerializeToString,
+                response_deserializer=room__pb2.RoomResponse.FromString,
+                _registered_method=True)
 
 
 class RoomServiceServicer(object):
@@ -50,11 +60,33 @@ class RoomServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def LeaveRoom(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetRoomMembers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RoomServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'JoinRoom': grpc.unary_unary_rpc_method_handler(
                     servicer.JoinRoom,
+                    request_deserializer=room__pb2.RoomRequest.FromString,
+                    response_serializer=room__pb2.RoomResponse.SerializeToString,
+            ),
+            'LeaveRoom': grpc.unary_unary_rpc_method_handler(
+                    servicer.LeaveRoom,
+                    request_deserializer=room__pb2.RoomRequest.FromString,
+                    response_serializer=room__pb2.RoomResponse.SerializeToString,
+            ),
+            'GetRoomMembers': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRoomMembers,
                     request_deserializer=room__pb2.RoomRequest.FromString,
                     response_serializer=room__pb2.RoomResponse.SerializeToString,
             ),
@@ -84,6 +116,60 @@ class RoomService(object):
             request,
             target,
             '/room.RoomService/JoinRoom',
+            room__pb2.RoomRequest.SerializeToString,
+            room__pb2.RoomResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def LeaveRoom(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/room.RoomService/LeaveRoom',
+            room__pb2.RoomRequest.SerializeToString,
+            room__pb2.RoomResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetRoomMembers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/room.RoomService/GetRoomMembers',
             room__pb2.RoomRequest.SerializeToString,
             room__pb2.RoomResponse.FromString,
             options,

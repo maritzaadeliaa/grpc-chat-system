@@ -10,4 +10,5 @@ message ChatMessage {
   string username = 1;
   string room = 2;
   string message = 3;
+  string timestamp = 4;
 }

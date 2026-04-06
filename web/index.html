@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>gRPC Chat System</title>
+  <meta name="description" content="Real-time chat system powered by gRPC bidirectional streaming"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    /* ─── Reset & Variables ─────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:     #0d0f14;
+      --bg-panel:    #13161e;
+      --bg-card:     #1a1f2e;
+      --bg-hover:    #1f2535;
+      --bg-input:    #161b28;
+      --accent:      #6c63ff;
+      --accent-light:#8b85ff;
+      --accent-glow: rgba(108,99,255,0.35);
+      --success:     #2dd4a0;
+      --danger:      #ff5f7e;
+      --warning:     #f0b429;
+      --text-primary:#e8eaf6;
+      --text-secondary:#8892b0;
+      --text-muted:  #4a5568;
+      --border:      rgba(255,255,255,0.07);
+      --border-accent: rgba(108,99,255,0.4);
+      --radius:      12px;
+      --radius-sm:   8px;
+      --transition:  0.2s cubic-bezier(0.4,0,0.2,1);
+      --shadow:      0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── Scrollbar ────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 99px; }
+
+    /* ─── Login Screen ──────────────────────────────── */
+    #login-screen {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at 30% 30%, rgba(108,99,255,0.15) 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 70%, rgba(45,212,160,0.08) 0%, transparent 60%),
+                  var(--bg-base);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity var(--transition), visibility var(--transition);
+    }
+
+    #login-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .login-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px 40px;
+      width: 420px;
+      box-shadow: var(--shadow), 0 0 60px var(--accent-glow);
+      animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1);
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+
+    .login-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, var(--accent), var(--success));
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    .login-logo h1 {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .login-logo p {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .form-group input::placeholder { color: var(--text-muted); }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 13px;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform var(--transition), box-shadow var(--transition), opacity var(--transition);
+      box-shadow: 0 4px 20px var(--accent-glow);
+      margin-top: 8px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 30px var(--accent-glow);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .login-error {
+      color: var(--danger);
+      font-size: 13px;
+      margin-top: 12px;
+      text-align: center;
+      min-height: 20px;
+      animation: shake 0.3s ease;
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    /* ─── App Layout ────────────────────────────────── */
+    #app {
+      display: flex;
+      height: 100vh;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    #app.visible { opacity: 1; }
+
+    /* ─── Sidebar ────────────────────────────────────── */
+    .sidebar {
+      width: 280px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .sidebar-logo .logo-icon {
+      width: 36px; height: 36px;
+      font-size: 16px;
+      border-radius: 10px;
+    }
+
+    .sidebar-logo h2 {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--success));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .user-info .name {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .user-info .status {
+      font-size: 11px;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(45,212,160,0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 4px rgba(45,212,160,0); }
+    }
+
+    /* Join Room Form */
+    .join-section {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+    }
+
+    .join-input-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .join-input-group input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+
+    .join-input-group input:focus { border-color: var(--accent); }
+    .join-input-group input::placeholder { color: var(--text-muted); }
+
+    .btn-join {
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition), transform var(--transition);
+      white-space: nowrap;
+    }
+
+    .btn-join:hover { background: var(--accent-light); transform: translateY(-1px); }
+
+    /* Room List */
+    .rooms-section {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 12px;
+    }
+
+    .room-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--transition);
+      position: relative;
+    }
+
+    .room-item:hover { background: var(--bg-hover); }
+
+    .room-item.active {
+      background: var(--bg-card);
+      border: 1px solid var(--border-accent);
+    }
+
+    .room-icon {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .room-icon.color-1 { background: rgba(108,99,255,0.2); }
+    .room-icon.color-2 { background: rgba(45,212,160,0.2); }
+    .room-icon.color-3 { background: rgba(240,180,41,0.2); }
+    .room-icon.color-4 { background: rgba(255,95,126,0.2); }
+
+    .room-details .room-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .room-details .room-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .unread-badge {
+      margin-left: auto;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 99px;
+      display: none;
+    }
+
+    .unread-badge.visible { display: block; }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-logout {
+      width: 100%;
+      background: transparent;
+      border: 1px solid rgba(255,95,126,0.3);
+      border-radius: var(--radius-sm);
+      padding: 9px;
+      color: var(--danger);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .btn-logout:hover {
+      background: rgba(255,95,126,0.1);
+      border-color: var(--danger);
+    }
+
+    /* ─── Chat Area ──────────────────────────────────── */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Welcome screen */
+    #welcome-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .welcome-icon {
+      width: 72px; height: 72px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--accent), var(--success));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+      box-shadow: 0 8px 32px var(--accent-glow);
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    #welcome-screen h2 {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    #welcome-screen p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      max-width: 320px;
+      line-height: 1.6;
+    }
+
+    /* Chat panel */
+    #chat-panel {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #chat-panel.visible { display: flex; }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 24px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .chat-header-icon {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: rgba(108,99,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .chat-header-info .room-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .chat-header-info .room-status {
+      font-size: 12px;
+      color: var(--success);
+    }
+
+    .online-count {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(45,212,160,0.1);
+      border: 1px solid rgba(45,212,160,0.2);
+      border-radius: 99px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--success);
+    }
+
+    .btn-leave {
+      background: transparent;
+      border: 1px solid rgba(255,95,126,0.3);
+      border-radius: var(--radius-sm);
+      padding: 7px 14px;
+      color: var(--danger);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition);
+    }
+
+    .btn-leave:hover { background: rgba(255,95,126,0.1); }
+
+    /* Messages */
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .msg-date-divider {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 12px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .msg-date-divider::before,
+    .msg-date-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .msg-wrapper {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      animation: msgIn 0.25s cubic-bezier(0.16,1,0.3,1);
+    }
+
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-wrapper.self { flex-direction: row-reverse; }
+
+    .msg-avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      margin-bottom: 2px;
+    }
+
+    .msg-content { max-width: 65%; }
+
+    .msg-name {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .msg-wrapper.self .msg-name { text-align: right; }
+
+    .msg-bubble {
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .msg-wrapper:not(.self) .msg-bubble {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+      color: var(--text-primary);
+    }
+
+    .msg-wrapper.self .msg-bubble {
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      border-bottom-right-radius: 4px;
+      color: #fff;
+    }
+
+    .msg-time {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
+    .msg-wrapper.self .msg-time { text-align: right; }
+
+    /* System messages */
+    .msg-system {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 99px;
+      margin: 4px auto;
+      max-width: 400px;
+      border: 1px solid var(--border);
+      animation: msgIn 0.25s ease;
+    }
+
+    /* Input Area */
+    .input-area {
+      padding: 16px 24px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border);
+    }
+
+    .input-form {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .msg-input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    #msg-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      outline: none;
+      resize: none;
+      max-height: 120px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      line-height: 1.5;
+    }
+
+    #msg-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    #msg-input::placeholder { color: var(--text-muted); }
+
+    .btn-send {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      border: none;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: transform var(--transition), box-shadow var(--transition);
+      box-shadow: 0 4px 16px var(--accent-glow);
+      flex-shrink: 0;
+    }
+
+    .btn-send:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--accent-glow);
+    }
+
+    .btn-send:active { transform: scale(0.95); }
+
+    .btn-send svg { stroke: #fff; }
+
+    /* ─── Toast ──────────────────────────────────────── */
+    .toast-container {
+      position: fixed;
+      top: 20px; right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 999;
+    }
+
+    .toast {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      animation: toastIn 0.3s cubic-bezier(0.16,1,0.3,1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 200px;
+      max-width: 300px;
+    }
+
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.error   { border-left: 3px solid var(--danger); }
+    .toast.info    { border-left: 3px solid var(--accent); }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ─── Connection Status ──────────────────────────── */
+    .conn-badge {
+      position: fixed;
+      bottom: 20px; right: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all var(--transition);
+      z-index: 50;
+    }
+
+    .conn-badge .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+
+    .conn-badge.connected { color: var(--success); }
+    .conn-badge.connected .dot { background: var(--success); animation: pulse 2s infinite; }
+    .conn-badge.disconnected { color: var(--danger); }
+    .conn-badge.disconnected .dot { background: var(--danger); }
+    .conn-badge.connecting { color: var(--warning); }
+    .conn-badge.connecting .dot { background: var(--warning); animation: pulse 1s infinite; }
+
+    /* ─── Empty state for rooms list ─────────────────── */
+    .rooms-empty {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .rooms-empty .icon { font-size: 28px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<!-- ─── Login Screen ────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">💬</div>
+      <div>
+        <h1>gRPC Chat</h1>
+        <p>Bidirectional Streaming</p>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="login-username">Username</label>
+      <input
+        id="login-username"
+        type="text"
+        placeholder="Masukkan username kamu..."
+        autocomplete="off"
+        maxlength="30"
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="login-room">Room</label>
+      <input
+        id="login-room"
+        type="text"
+        placeholder="Nama room (cth: room-it)"
+        autocomplete="off"
+        maxlength="30"
+      />
+    </div>
+
+    <button id="btn-login" class="btn-primary">
+      Masuk ke Chat →
+    </button>
+
+    <div id="login-error" class="login-error"></div>
+  </div>
+</div>
+
+<!-- ─── Main App ────────────────────────────────────── -->
+<div id="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-icon">💬</div>
+        <h2>gRPC Chat</h2>
+      </div>
+      <div class="user-badge" id="user-badge" style="display:none">
+        <div class="avatar" id="user-avatar">?</div>
+        <div class="user-info">
+          <div class="name" id="sidebar-username">-</div>
+          <div class="status">
+            <div class="status-dot"></div>
+            Online
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="join-section">
+      <div class="section-title">Gabung Room</div>
+      <div class="join-input-group">
+        <input id="join-room-input" type="text" placeholder="Nama room..." maxlength="30"/>
+        <button id="btn-join-room" class="btn-join">＋ Join</button>
+      </div>
+    </div>
+
+    <div class="rooms-section" id="rooms-list">
+      <div class="rooms-empty">
+        <div class="icon">🏠</div>
+        Belum ada room.<br/>Gabung room di atas atau login dulu.
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button id="btn-logout" class="btn-logout">🚪 Keluar</button>
+    </div>
+  </aside>
+
+  <!-- Chat Area -->
+  <main class="chat-area">
+    <!-- Welcome -->
+    <div id="welcome-screen">
+      <div class="welcome-icon">💬</div>
+      <h2>Selamat Datang!</h2>
+      <p>Login dan gabung ke sebuah room untuk mulai chatting secara real-time via gRPC Bidirectional Streaming.</p>
+    </div>
+
+    <!-- Chat Panel -->
+    <div id="chat-panel">
+      <div class="chat-header">
+        <div class="chat-header-icon" id="chat-room-icon">🏠</div>
+        <div class="chat-header-info">
+          <div class="room-title" id="chat-room-title">-</div>
+          <div class="room-status" id="chat-room-status">Connected via gRPC</div>
+        </div>
+        <div class="online-count" id="online-count">
+          <div class="status-dot" style="background:var(--success);"></div>
+          <span>Live</span>
+        </div>
+        <button class="btn-leave" id="btn-leave-room">Keluar Room</button>
+      </div>
+      <div class="messages-container" id="messages-container">
+        <!-- Messages di-render di sini -->
+      </div>
+      <div class="input-area">
+        <div class="input-form">
+          <div class="msg-input-wrapper">
+            <textarea
+              id="msg-input"
+              placeholder="Ketik pesan... (Enter untuk kirim)"
+              rows="1"
+            ></textarea>
+          </div>
+          <button class="btn-send" id="btn-send" title="Kirim">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Connection Badge -->
+<div class="conn-badge disconnected" id="conn-badge">
+  <div class="dot"></div>
+  <span>Disconnected</span>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────
+const state = {
+  username: null,
+  currentRoom: null,
+  ws: null,
+  rooms: {},      // { roomName: [messages] }
+  unread: {},     // { roomName: count }
+  avatarColors: {},
+};
+
+const COLORS = [
+  '#6c63ff','#2dd4a0','#ff6b9d','#f0b429',
+  '#00d4ff','#ff7849','#a855f7','#22c55e'
+];
+
+// ─── DOM References ──────────────────────────────────────
+const loginScreen    = document.getElementById('login-screen');
+const app            = document.getElementById('app');
+const loginUsername  = document.getElementById('login-username');
+const loginRoom      = document.getElementById('login-room');
+const btnLogin       = document.getElementById('btn-login');
+const loginError     = document.getElementById('login-error');
+const userBadge      = document.getElementById('user-badge');
+const userAvatar     = document.getElementById('user-avatar');
+const sidebarUsername= document.getElementById('sidebar-username');
+const roomsList      = document.getElementById('rooms-list');
+const joinRoomInput  = document.getElementById('join-room-input');
+const btnJoinRoom    = document.getElementById('btn-join-room');
+const btnLogout      = document.getElementById('btn-logout');
+const welcomeScreen  = document.getElementById('welcome-screen');
+const chatPanel      = document.getElementById('chat-panel');
+const chatRoomTitle  = document.getElementById('chat-room-title');
+const chatRoomStatus = document.getElementById('chat-room-status');
+const chatRoomIcon   = document.getElementById('chat-room-icon');
+const messagesContainer = document.getElementById('messages-container');
+const msgInput       = document.getElementById('msg-input');
+const btnSend        = document.getElementById('btn-send');
+const btnLeaveRoom   = document.getElementById('btn-leave-room');
+const connBadge      = document.getElementById('conn-badge');
+
+// ─── Utilities ──────────────────────────────────────────
+function getAvatarColor(name) {
+  if (!state.avatarColors[name]) {
+    const idx = Object.keys(state.avatarColors).length % COLORS.length;
+    state.avatarColors[name] = COLORS[idx];
+  }
+  return state.avatarColors[name];
+}
+
+function getInitials(name) {
+  return name ? name.slice(0, 2).toUpperCase() : '??';
+}
+
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+  el.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function setConnBadge(status) {
+  connBadge.className = `conn-badge ${status}`;
+  const labels = { connected: 'Connected', disconnected: 'Disconnected', connecting: 'Connecting...' };
+  connBadge.querySelector('span').textContent = labels[status] || status;
+}
+
+function scrollToBottom() {
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// ─── API Helpers ─────────────────────────────────────────
+async function apiPost(path, body) {
+  const r = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: 'Network error' }));
+    throw new Error(err.detail || 'Unknown error');
+  }
+  return r.json();
+}
+
+// ─── Room UI Helpers ─────────────────────────────────────
+const ROOM_ICONS = ['🏠', '🚀', '⚡', '🌊', '🎮', '📡', '🔥', '💡'];
+const ROOM_COLORS = ['color-1', 'color-2', 'color-3', 'color-4'];
+let roomColorIndex = 0;
+const roomMeta = {};
+
+function getRoomMeta(roomName) {
+  if (!roomMeta[roomName]) {
+    const idx = Object.keys(roomMeta).length;
+    roomMeta[roomName] = {
+      icon: ROOM_ICONS[idx % ROOM_ICONS.length],
+      color: ROOM_COLORS[idx % ROOM_COLORS.length],
+    };
+  }
+  return roomMeta[roomName];
+}
+
+function renderRooms() {
+  const rooms = Object.keys(state.rooms);
+  if (rooms.length === 0) {
+    roomsList.innerHTML = `
+      <div class="rooms-empty">
+        <div class="icon">🏠</div>
+        Belum ada room.<br/>Gabung room di atas!
+      </div>`;
+    return;
+  }
+
+  roomsList.innerHTML = '';
+  rooms.forEach(room => {
+    const meta = getRoomMeta(room);
+    const isActive = room === state.currentRoom;
+    const unread = state.unread[room] || 0;
+    const el = document.createElement('div');
+    el.className = `room-item${isActive ? ' active' : ''}`;
+    el.dataset.room = room;
+    el.innerHTML = `
+      <div class="room-icon ${meta.color}">${meta.icon}</div>
+      <div class="room-details">
+        <div class="room-name">${room}</div>
+        <div class="room-sub">Active</div>
+      </div>
+      <div class="unread-badge ${unread > 0 ? 'visible' : ''}">${unread}</div>`;
+    el.addEventListener('click', () => switchRoom(room));
+    roomsList.appendChild(el);
+  });
+}
+
+// ─── Message Rendering ────────────────────────────────────
+function renderMessage(msg) {
+  const isSelf = msg.username === state.username;
+  const isSystem = msg.type === 'system';
+
+  if (isSystem) {
+    const el = document.createElement('div');
+    el.className = 'msg-system';
+    el.textContent = msg.message;
+    messagesContainer.appendChild(el);
+  } else {
+    const el = document.createElement('div');
+    el.className = `msg-wrapper${isSelf ? ' self' : ''}`;
+
+    const color = getAvatarColor(msg.username);
+    el.innerHTML = `
+      <div class="msg-avatar" style="background:${color}">${getInitials(msg.username)}</div>
+      <div class="msg-content">
+        ${!isSelf ? `<div class="msg-name">${msg.username}</div>` : ''}
+        <div class="msg-bubble">${escapeHtml(msg.message)}</div>
+        <div class="msg-time">${msg.timestamp || ''}</div>
+      </div>`;
+    messagesContainer.appendChild(el);
+  }
+
+  scrollToBottom();
+}
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/\n/g, '<br/>');
+}
+
+// ─── WebSocket ────────────────────────────────────────────
+function connectWebSocket(username, room) {
+  // Tutup WS lama jika ada
+  if (state.ws) {
+    state.ws.close();
+    state.ws = null;
+  }
+
+  const wsUrl = `ws://${window.location.host}/ws/chat/${encodeURIComponent(username)}/${encodeURIComponent(room)}`;
+  setConnBadge('connecting');
+  chatRoomStatus.textContent = 'Connecting...';
+
+  const ws = new WebSocket(wsUrl);
+  state.ws = ws;
+
+  ws.onopen = () => {
+    setConnBadge('connected');
+    chatRoomStatus.textContent = 'Connected via gRPC WebSocket';
+    toast(`Terhubung ke room "${room}"`, 'success');
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+
+      // Simpan pesan ke state (untuk switching room)
+      if (!state.rooms[room]) state.rooms[room] = [];
+      state.rooms[room].push(msg);
+
+      // Render hanya jika room ini yang sedang aktif
+      if (state.currentRoom === room) {
+        renderMessage(msg);
+      } else {
+        // Tambah unread badge
+        if (!state.unread[room]) state.unread[room] = 0;
+        if (msg.type !== 'system') state.unread[room]++;
+        renderRooms();
+      }
+    } catch(e) {
+      console.error('Parse error:', e);
+    }
+  };
+
+  ws.onerror = (e) => {
+    setConnBadge('disconnected');
+    chatRoomStatus.textContent = 'Connection error';
+    console.error('WS error:', e);
+  };
+
+  ws.onclose = () => {
+    setConnBadge('disconnected');
+    chatRoomStatus.textContent = 'Disconnected';
+    if (state.ws === ws) {
+      state.ws = null;
+    }
+  };
+}
+
+// ─── Room Switching ───────────────────────────────────────
+function switchRoom(roomName) {
+  if (state.currentRoom === roomName) return;
+
+  // Tutup WS lama
+  if (state.ws) {
+    state.ws.close();
+    state.ws = null;
+  }
+
+  state.currentRoom = roomName;
+  state.unread[roomName] = 0;
+
+  // Update header
+  const meta = getRoomMeta(roomName);
+  chatRoomTitle.textContent = `# ${roomName}`;
+  chatRoomIcon.textContent = meta.icon;
+
+  // Clear & restore messages
+  messagesContainer.innerHTML = '';
+  const msgs = state.rooms[roomName] || [];
+  msgs.forEach(msg => renderMessage(msg));
+
+  // Tampilkan chat panel
+  welcomeScreen.style.display = 'none';
+  chatPanel.classList.add('visible');
+  chatPanel.style.display = 'flex';
+
+  renderRooms();
+
+  // Buka WS baru ke room ini
+  connectWebSocket(state.username, roomName);
+}
+
+// ─── Login Flow ───────────────────────────────────────────
+async function doLogin() {
+  const username = loginUsername.value.trim();
+  const room = loginRoom.value.trim();
+
+  if (!username) {
+    loginError.textContent = 'Username tidak boleh kosong!';
+    return;
+  }
+  if (!room) {
+    loginError.textContent = 'Nama room tidak boleh kosong!';
+    return;
+  }
+
+  loginError.textContent = '';
+  btnLogin.disabled = true;
+  btnLogin.textContent = 'Menghubungkan...';
+
+  try {
+    // 1. Login ke UserService
+    const loginRes = await apiPost('/login', { username });
+    if (loginRes.status !== 'SUCCESS') {
+      throw new Error(loginRes.message);
+    }
+
+    // 2. Join Room
+    const roomRes = await apiPost('/join-room', { username, room });
+    if (roomRes.status !== 'SUCCESS') {
+      throw new Error(roomRes.message);
+    }
+
+    // 3. Update state
+    state.username = username;
+    state.rooms[room] = [];
+    state.unread[room] = 0;
+    state.avatarColors[username] = COLORS[0];
+
+    // 4. Update sidebar UI
+    const initials = getInitials(username);
+    userAvatar.textContent = initials;
+    userAvatar.style.background = getAvatarColor(username);
+    sidebarUsername.textContent = username;
+    userBadge.style.display = 'flex';
+
+    // 5. Transisi ke app
+    loginScreen.classList.add('hidden');
+    app.classList.add('visible');
+
+    // 6. Render rooms & switch
+    renderRooms();
+    switchRoom(room);
+
+  } catch(err) {
+    loginError.textContent = err.message || 'Login gagal. Coba lagi.';
+    btnLogin.disabled = false;
+    btnLogin.textContent = 'Masuk ke Chat →';
+  }
+}
+
+// ─── Join Additional Room ─────────────────────────────────
+async function joinNewRoom() {
+  const room = joinRoomInput.value.trim();
+  if (!room) return;
+  if (!state.username) {
+    toast('Login dulu!', 'error');
+    return;
+  }
+  if (state.rooms[room]) {
+    toast(`Kamu sudah di room "${room}"`, 'info');
+    switchRoom(room);
+    joinRoomInput.value = '';
+    return;
+  }
+
+  try {
+    const res = await apiPost('/join-room', { username: state.username, room });
+    if (res.status !== 'SUCCESS') throw new Error(res.message);
+
+    state.rooms[room] = [];
+    state.unread[room] = 0;
+    joinRoomInput.value = '';
+    renderRooms();
+    switchRoom(room);
+    toast(`Berhasil join room "${room}"`, 'success');
+  } catch(err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ─── Leave Room ───────────────────────────────────────────
+async function leaveCurrentRoom() {
+  const room = state.currentRoom;
+  if (!room) return;
+
+  try {
+    await apiPost('/leave-room', { username: state.username, room });
+  } catch(e) {}
+
+  // Tutup WS
+  if (state.ws) { state.ws.close(); state.ws = null; }
+
+  // Hapus dari state
+  delete state.rooms[room];
+  delete state.unread[room];
+
+  // Cari room lain untuk berpindah
+  const remaining = Object.keys(state.rooms);
+  if (remaining.length > 0) {
+    switchRoom(remaining[0]);
+  } else {
+    state.currentRoom = null;
+    chatPanel.classList.remove('visible');
+    welcomeScreen.style.display = 'flex';
+    setConnBadge('disconnected');
+  }
+
+  renderRooms();
+  toast(`Keluar dari room "${room}"`, 'info');
+}
+
+// ─── Send Message ─────────────────────────────────────────
+function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text || !state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+
+  state.ws.send(JSON.stringify({ message: text }));
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+}
+
+// ─── Logout ───────────────────────────────────────────────
+async function doLogout() {
+  if (state.ws) { state.ws.close(); state.ws = null; }
+
+  try {
+    if (state.username) {
+      // Leave all rooms
+      for (const room of Object.keys(state.rooms)) {
+        await apiPost('/leave-room', { username: state.username, room }).catch(() => {});
+      }
+      await apiPost('/logout', { username: state.username }).catch(() => {});
+    }
+  } catch(e) {}
+
+  // Reset state
+  state.username = null;
+  state.currentRoom = null;
+  state.rooms = {};
+  state.unread = {};
+  state.avatarColors = {};
+
+  // Reset UI
+  chatPanel.classList.remove('visible');
+  welcomeScreen.style.display = 'flex';
+  userBadge.style.display = 'none';
+  renderRooms();
+  setConnBadge('disconnected');
+
+  loginError.textContent = '';
+  loginUsername.value = '';
+  loginRoom.value = '';
+  btnLogin.disabled = false;
+  btnLogin.textContent = 'Masuk ke Chat →';
+  loginScreen.classList.remove('hidden');
+  app.classList.remove('visible');
+}
+
+// ─── Auto-resize textarea ─────────────────────────────────
+msgInput.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// ─── Event Listeners ──────────────────────────────────────
+btnLogin.addEventListener('click', doLogin);
+
+loginUsername.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    loginRoom.focus();
+  }
+});
+
+loginRoom.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    doLogin();
+  }
+});
+
+btnJoinRoom.addEventListener('click', joinNewRoom);
+
+joinRoomInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    joinNewRoom();
+  }
+});
+
+btnSend.addEventListener('click', sendMessage);
+
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+btnLeaveRoom.addEventListener('click', leaveCurrentRoom);
+btnLogout.addEventListener('click', doLogout);
+
+// ─── Init ─────────────────────────────────────────────────
+loginUsername.focus();
+setConnBadge('disconnected');
+</script>
+</body>
+</html>

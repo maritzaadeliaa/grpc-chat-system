@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nroom.proto\x12\x04room\"-\n\x0bRoomRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x0c\n\x04room\x18\x02 \x01(\t\"/\n\x0cRoomResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t2@\n\x0bRoomService\x12\x31\n\x08JoinRoom\x12\x11.room.RoomRequest\x1a\x12.room.RoomResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nroom.proto\x12\x04room\"-\n\x0bRoomRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x0c\n\x04room\x18\x02 \x01(\t\"/\n\x0cRoomResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t2\xad\x01\n\x0bRoomService\x12\x31\n\x08JoinRoom\x12\x11.room.RoomRequest\x1a\x12.room.RoomResponse\x12\x32\n\tLeaveRoom\x12\x11.room.RoomRequest\x1a\x12.room.RoomResponse\x12\x37\n\x0eGetRoomMembers\x12\x11.room.RoomRequest\x1a\x12.room.RoomResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,6 +35,6 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ROOMREQUEST']._serialized_end=65
   _globals['_ROOMRESPONSE']._serialized_start=67
   _globals['_ROOMRESPONSE']._serialized_end=114
-  _globals['_ROOMSERVICE']._serialized_start=116
-  _globals['_ROOMSERVICE']._serialized_end=180
+  _globals['_ROOMSERVICE']._serialized_start=117
+  _globals['_ROOMSERVICE']._serialized_end=290
 # @@protoc_insertion_point(module_scope)
