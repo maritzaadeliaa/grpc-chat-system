@@ -177,7 +177,14 @@ async def websocket_chat(ws: WebSocket, username: str, room: str):
     grpc_error = [None]
 
     def run_grpc_stream():
-        """Thread yang menjalankan gRPC streaming dan memforward pesan ke WebSocket."""
+        """Thread yang menjalankan gRPC streaming dan memforward pesan ke WebSocket.
+
+        PENTING: Kirim hanya ke WebSocket milik stream INI (send_to_ws), bukan ke
+        semua user (broadcast_to_room). Broadcasting sudah diurus oleh Chat Server
+        di level gRPC queue — setiap user punya queue sendiri dan sudah menerima
+        pesan dari sana. Kalau kita broadcast lagi di sini, setiap pesan akan
+        muncul 2x (double bubble).
+        """
         try:
             for response in chat_stub.ChatStream(grpc_message_generator()):
                 msg_data = {
@@ -187,9 +194,9 @@ async def websocket_chat(ws: WebSocket, username: str, room: str):
                     "message": response.message,
                     "timestamp": response.timestamp or datetime.now().strftime("%H:%M:%S")
                 }
-                # Kirim ke SEMUA WebSocket di room (bukan via gRPC broadcast tapi via WebSocket manager)
+                # Kirim HANYA ke WebSocket pemilik stream ini
                 asyncio.run_coroutine_threadsafe(
-                    manager.broadcast_to_room(room, msg_data),
+                    manager.send_to_ws(ws, msg_data),
                     loop
                 )
         except grpc.RpcError as e:
