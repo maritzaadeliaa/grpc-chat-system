@@ -7,8 +7,9 @@ service ChatService {
 }
 
 message ChatMessage {
-  string username = 1;
-  string room = 2;
-  string message = 3;
+  string username  = 1;
+  string room      = 2;
+  string message   = 3;
   string timestamp = 4;
+  string msg_type  = 5; // "message" | "typing" | "join" | "leave"
 }

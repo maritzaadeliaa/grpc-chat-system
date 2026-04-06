@@ -26,9 +26,13 @@ class RoomService(room_pb2_grpc.RoomServiceServicer):
         if room not in rooms:
             rooms[room] = []
 
-        if username not in rooms[room]:
-            rooms[room].append(username)
+        if username in rooms[room]:
+            return room_pb2.RoomResponse(
+                status="FAIL",
+                message=f"Username '{username}' sudah berada di room '{room}'"
+            )
 
+        rooms[room].append(username)
         print(f"[RoomService] {username} joined '{room}'. Members: {rooms[room]}")
 
         return room_pb2.RoomResponse(

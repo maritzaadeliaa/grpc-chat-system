@@ -188,7 +188,7 @@ async def websocket_chat(ws: WebSocket, username: str, room: str):
         try:
             for response in chat_stub.ChatStream(grpc_message_generator()):
                 msg_data = {
-                    "type": "message",
+                    "type": response.msg_type or "message",
                     "username": response.username,
                     "room": response.room,
                     "message": response.message,
@@ -209,6 +209,13 @@ async def websocket_chat(ws: WebSocket, username: str, room: str):
     grpc_thread = threading.Thread(target=run_grpc_stream, daemon=True)
     grpc_thread.start()
 
+    # ── kirim sinyal join ke gRPC agar segera didaftarkan ──
+    send_queue.put(chat_pb2.ChatMessage(
+        username=username,
+        room=room,
+        msg_type="join"
+    ))
+
     # ── kirim notifikasi join ke room ──
     join_msg = {
         "type": "system",
@@ -217,14 +224,14 @@ async def websocket_chat(ws: WebSocket, username: str, room: str):
     }
     await manager.broadcast_to_room(room, join_msg)
 
-    # ── loop menerima pesan dari WebSocket ──
     try:
         while True:
             data = await ws.receive_text()
             msg_dict = json.loads(data)
+            msg_type = msg_dict.get("type", "message")
             text = msg_dict.get("message", "").strip()
 
-            if not text:
+            if msg_type == "message" and not text:
                 continue
 
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -234,7 +241,8 @@ async def websocket_chat(ws: WebSocket, username: str, room: str):
                 username=username,
                 room=room,
                 message=text,
-                timestamp=timestamp
+                timestamp=timestamp,
+                msg_type=msg_type
             ))
 
     except WebSocketDisconnect:

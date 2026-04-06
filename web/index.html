@@ -886,6 +886,9 @@
       <div class="messages-container" id="messages-container">
         <!-- Messages di-render di sini -->
       </div>
+      <div id="typing-indicator" style="display:none; padding: 4px 24px; font-size: 11px; color: var(--text-muted); font-style: italic;">
+        Someone is typing...
+      </div>
       <div class="input-area">
         <div class="input-form">
           <div class="msg-input-wrapper">
@@ -1113,6 +1116,19 @@ function connectWebSocket(username, room) {
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
+
+      if (msg.type === 'typing') {
+        if (state.currentRoom === room) {
+          const ti = document.getElementById('typing-indicator');
+          ti.textContent = `${msg.username} sedang mengetik...`;
+          ti.style.display = 'block';
+          clearTimeout(state.typingTimeout);
+          state.typingTimeout = setTimeout(() => {
+            ti.style.display = 'none';
+          }, 2000);
+        }
+        return;
+      }
 
       // Simpan pesan ke state (untuk switching room)
       if (!state.rooms[room]) state.rooms[room] = [];
@@ -1348,10 +1364,19 @@ async function doLogout() {
   app.classList.remove('visible');
 }
 
-// ─── Auto-resize textarea ─────────────────────────────────
+// ─── Auto-resize textarea & Typing Ind. ─────────────────────
+let lastTypingTime = 0;
 msgInput.addEventListener('input', function() {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+
+  const now = Date.now();
+  if (now - lastTypingTime > 1000) {
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify({ type: 'typing', message: '' }));
+      lastTypingTime = now;
+    }
+  }
 });
 
 // ─── Event Listeners ──────────────────────────────────────
