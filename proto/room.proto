@@ -4,6 +4,8 @@ package room;
 
 service RoomService {
   rpc JoinRoom(RoomRequest) returns (RoomResponse);
+  rpc LeaveRoom(RoomRequest) returns (RoomResponse);
+  rpc GetRoomMembers(RoomRequest) returns (RoomResponse);
 }
 
 message RoomRequest {
