@@ -99,10 +99,11 @@ class ChatService(chat_pb2_grpc.ChatServiceServicer):
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
     chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatService(), server)
-    server.add_insecure_port('[::]:50051')
+    # Gunakan 0.0.0.0 agar lebih stabil di Windows (kompatibilitas IPv4/v6)
+    server.add_insecure_port('0.0.0.0:50054')
     server.start()
     print("=" * 40)
-    print("[OK] Chat Server running on port 50051")
+    print("[OK] Chat Server running on port 50054")
     print("=" * 40)
     try:
         while True:

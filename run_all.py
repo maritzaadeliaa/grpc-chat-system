@@ -29,7 +29,7 @@ SERVICES = [
     {
         "name": "Chat Service",
         "cmd": [sys.executable, "-m", "server.chat_service.chat_server"],
-        "port": 50051,
+        "port": 50054,
         "color": "\033[35m",  # Magenta
     },
     {
@@ -96,15 +96,16 @@ def start_all():
         t.start()
 
         # Tunggu sebentar antar launch biar tidak rebutan port
-        time.sleep(1.0)
+        time.sleep(1.5)
         print(f"{svc['color']}[OK] {svc['name']}{RESET} started (port {svc['port']})")
 
-    print(f"\n{BOLD}{'─' * 55}{RESET}")
+
+    print(f"\n{BOLD}{'-' * 55}{RESET}")
     print(f"{BOLD}  Web UI  : http://localhost:8000{RESET}")
-    print(f"{BOLD}  Chat    : gRPC @ localhost:50051{RESET}")
+    print(f"{BOLD}  Chat    : gRPC @ localhost:50054{RESET}")
     print(f"{BOLD}  User    : gRPC @ localhost:50052{RESET}")
     print(f"{BOLD}  Room    : gRPC @ localhost:50053{RESET}")
-    print(f"{BOLD}{'─' * 55}{RESET}")
+    print(f"{BOLD}{'-' * 55}{RESET}")
     print(f"\n  Tekan {BOLD}Ctrl+C{RESET} untuk menghentikan semua service.\n")
 
 

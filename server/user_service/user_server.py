@@ -57,7 +57,7 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     user_pb2_grpc.add_UserServiceServicer_to_server(UserService(), server)
 
-    server.add_insecure_port('[::]:50052')
+    server.add_insecure_port('0.0.0.0:50052')
     server.start()
     print("=" * 40)
     print("[OK] User Server running on port 50052")

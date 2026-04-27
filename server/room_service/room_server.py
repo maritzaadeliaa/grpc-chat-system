@@ -72,7 +72,8 @@ def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     room_pb2_grpc.add_RoomServiceServicer_to_server(RoomService(), server)
 
-    server.add_insecure_port('[::]:50053')
+    # Gunakan 0.0.0.0 agar lebih stabil di Windows (kompatibilitas IPv4/v6)
+    server.add_insecure_port('0.0.0.0:50053')
     server.start()
     print("=" * 40)
     print("[OK] Room Server running on port 50053")

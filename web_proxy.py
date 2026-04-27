@@ -118,7 +118,7 @@ user_stub     = user_pb2_grpc.UserServiceStub(user_channel)
 room_channel  = grpc.insecure_channel('localhost:50053')
 room_stub     = room_pb2_grpc.RoomServiceStub(room_channel)
 
-chat_channel  = grpc.insecure_channel('localhost:50051')
+chat_channel  = grpc.insecure_channel('localhost:50054')
 chat_stub     = chat_pb2_grpc.ChatServiceStub(chat_channel)
 
 
@@ -208,12 +208,16 @@ manager = ConnectionManager()
 _cpu_base  = random.uniform(20, 50)
 _mem_base  = random.uniform(30, 60)
 
+# Cooldown untuk CPU alert agar tidak spam
+_last_cpu_alert = 0
+_CPU_ALERT_COOLDOWN = 300  # 5 menit (agar tidak mengganggu chat)
+
 def _simulate_metrics() -> dict:
     """Menghasilkan data metrics server yang bervariasi secara simulasi."""
     global _cpu_base, _mem_base
     # Drift acak agar pergerakan lebih natural
-    _cpu_base = max(5,  min(95,  _cpu_base  + random.uniform(-5, 5)))
-    _mem_base = max(10, min(90,  _mem_base  + random.uniform(-2, 3)))
+    _cpu_base = max(5,  min(85,  _cpu_base  + random.uniform(-5, 5)))
+    _mem_base = max(10, min(80,  _mem_base  + random.uniform(-2, 3)))
     return {
         "cpu":         round(_cpu_base  + random.uniform(-3, 3), 1),
         "memory":      round(_mem_base  + random.uniform(-1, 1), 1),
@@ -240,7 +244,7 @@ async def server_metrics_broadcaster():
     Setiap ~30 detik mengirim system alert acak (maintenance notice, ping, dll).
     Ini adalah contoh server proaktif mendorong data tanpa request dari klien.
     """
-    global _alert_idx
+    global _alert_idx, _last_cpu_alert
     tick = 0
     while True:
         await asyncio.sleep(5)
@@ -257,8 +261,10 @@ async def server_metrics_broadcaster():
             "timestamp": datetime.now().strftime("%H:%M:%S"),
         })
 
-        # ── Server-Initiated Alert: threshold CPU/Memory ─────────────────
-        if metrics["cpu"] > 80:
+        # ── Server-Initiated Alert: threshold CPU dengan cooldown 5 menit ──
+        now = time.monotonic()
+        if metrics["cpu"] > 85 and (now - _last_cpu_alert) > _CPU_ALERT_COOLDOWN:
+            _last_cpu_alert = now
             await manager.broadcast_to_all({
                 "type":    "server_alert",
                 "level":   "danger",
@@ -266,8 +272,8 @@ async def server_metrics_broadcaster():
                 "timestamp": datetime.now().strftime("%H:%M:%S"),
             })
 
-        # ── Server-Initiated Alert: periodic system notices (~30 detik) ──
-        if tick % 30 == 0:
+        # ── Server-Initiated Alert: periodic system notices (~60 detik sekali) ──
+        if tick % 60 == 0:
             level, msg = _MAINTENANCE_ALERTS[_alert_idx % len(_MAINTENANCE_ALERTS)]
             _alert_idx += 1
             await manager.broadcast_to_all({
@@ -387,97 +393,117 @@ async def handle_command(ws: WebSocket, username: str, room: str, command: str, 
     """
     ts = datetime.now().strftime("%H:%M:%S")
 
-    if command == "get_members":
-        # ── Panggil gRPC RoomService.GetRoomMembers ──────────────────────────
-        try:
-            resp = room_stub.GetRoomMembers(
-                room_pb2.RoomRequest(username=username, room=room)
-            )
-            members = resp.message.split(",") if resp.message else []
-            members_clean = [m.strip() for m in members if m.strip()]
-            result_text = (
-                f"👥 Anggota room '{room}': {', '.join(members_clean)}"
-                if members_clean
-                else f"Room '{room}' saat ini kosong."
-            )
+    try:
+        if command == "get_members":
+            # ── Panggil gRPC RoomService.GetRoomMembers ──────────────────────────
+            try:
+                resp = room_stub.GetRoomMembers(
+                    room_pb2.RoomRequest(username=username, room=room)
+                )
+                members = resp.message.split(",") if resp.message else []
+                members_clean = [m.strip() for m in members if m.strip()]
+                result_text = (
+                    f"👥 Anggota room '{room}': {', '.join(members_clean)}"
+                    if members_clean
+                    else f"Room '{room}' saat ini kosong."
+                )
+                await manager.send_to_ws(ws, {
+                    "type":    "command_result",
+                    "command": command,
+                    "success": True,
+                    "result":  result_text,
+                    "timestamp": ts,
+                })
+            except grpc.RpcError as e:
+                await manager.send_to_ws(ws, {
+                    "type":    "command_result",
+                    "command": command,
+                    "success": False,
+                    "result":  f"gRPC error: {e.details()}",
+                    "timestamp": ts,
+                })
+
+        elif command == "ping_services":
+            # ── Cek health ke semua gRPC services ────────────────────────────────
+            services = [
+                ("UserService  (port 50052)", user_stub.Login,          user_pb2.UserRequest(username="_ping_")),
+                ("RoomService  (port 50053)", room_stub.GetRoomMembers, room_pb2.RoomRequest(username="_ping_", room="_ping_")),
+                ("ChatService  (port 50054)", None,                     None),
+            ]
+            results = []
+            for svc_name, method, req in services:
+                if method is None:
+                    # ChatService: buat koneksi sementara untuk cek ping
+                    try:
+                        test_ch = grpc.insecure_channel('localhost:50054')
+                        grpc.channel_ready_future(test_ch).result(timeout=2)
+                        test_ch.close()
+                        results.append(f"✅ {svc_name}: ONLINE")
+                    except Exception:
+                        results.append(f"❌ {svc_name}: OFFLINE atau tidak merespons")
+                else:
+                    try:
+                        method(req, timeout=2)
+                        results.append(f"✅ {svc_name}: ONLINE")
+                    except grpc.RpcError:
+                        # RpcError berarti server bisa dijangkau (hanya request-nya ditolak)
+                        results.append(f"✅ {svc_name}: ONLINE (reachable)")
+                    except Exception as ex:
+                        results.append(f"❌ {svc_name}: OFFLINE ({ex})")
+
             await manager.send_to_ws(ws, {
                 "type":    "command_result",
                 "command": command,
                 "success": True,
-                "result":  result_text,
+                "result":  "🔍 PING RESULTS:\n" + "\n".join(results),
                 "timestamp": ts,
             })
-        except grpc.RpcError as e:
+
+        elif command == "broadcast":
+            # ── Kirim system-announcement ke seluruh anggota room ────────────────
+            announcement = args.strip() if args else "(pesan kosong)"
+            await manager.broadcast_to_room(room, {
+                "type":      "server_alert",
+                "level":     "info",
+                "message":   f"📢 Pengumuman dari {username}: {announcement}",
+                "timestamp": ts,
+            })
+            await manager.send_to_ws(ws, {
+                "type":    "command_result",
+                "command": command,
+                "success": True,
+                "result":  f"Pengumuman terkirim ke room '{room}'.",
+                "timestamp": ts,
+            })
+
+        else:
             await manager.send_to_ws(ws, {
                 "type":    "command_result",
                 "command": command,
                 "success": False,
-                "result":  f"gRPC error: {e.details()}",
+                "result":  (
+                    f"❓ Command tidak dikenal: '{command}'\n"
+                    "Perintah tersedia:\n"
+                    "  /cmd get_members\n"
+                    "  /cmd ping_services\n"
+                    "  /cmd broadcast <pesan>"
+                ),
                 "timestamp": ts,
             })
 
-    elif command == "ping_services":
-        # ── Cek health ke semua gRPC services ────────────────────────────────
-        services = {
-            "UserService (50052)":  ("user",  user_stub,  user_pb2.UserRequest(username="_ping_")),
-            "RoomService (50053)":  ("room",  room_stub,  room_pb2.RoomRequest(username="_ping_", room="_ping_")),
-        }
-        results = []
-        for svc_name, (kind, stub, req) in services.items():
-            try:
-                if kind == "user":
-                    stub.Login(req, timeout=2)
-                else:
-                    stub.GetRoomMembers(req, timeout=2)
-                results.append(f"✅ {svc_name}: OK")
-            except grpc.RpcError:
-                results.append(f"✅ {svc_name}: OK (reachable)")
-            except Exception as ex:
-                results.append(f"❌ {svc_name}: UNREACHABLE ({ex})")
-
-        # ChatService tidak punya unary RPC, cukup cek channel state
-        ch_state = chat_channel.get_state(try_to_connect=False)
-        results.append(f"✅ ChatService (50051): {ch_state.name}")
-
-        await manager.send_to_ws(ws, {
-            "type":    "command_result",
-            "command": command,
-            "success": True,
-            "result":  "🔍 PING RESULTS:\n" + "\n".join(results),
-            "timestamp": ts,
-        })
-
-    elif command == "broadcast":
-        # ── Kirim system-announcement ke seluruh anggota room ────────────────
-        announcement = args.strip() if args else "(pesan kosong)"
-        await manager.broadcast_to_room(room, {
-            "type":      "server_alert",
-            "level":     "info",
-            "message":   f"📢 Pengumuman dari {username}: {announcement}",
-            "timestamp": ts,
-        })
-        await manager.send_to_ws(ws, {
-            "type":    "command_result",
-            "command": command,
-            "success": True,
-            "result":  f"Pengumuman terkirim ke room '{room}'.",
-            "timestamp": ts,
-        })
-
-    else:
-        await manager.send_to_ws(ws, {
-            "type":    "command_result",
-            "command": command,
-            "success": False,
-            "result":  (
-                f"❓ Command tidak dikenal: '{command}'\n"
-                "Perintah tersedia:\n"
-                "  /cmd get_members\n"
-                "  /cmd ping_services\n"
-                "  /cmd broadcast <pesan>"
-            ),
-            "timestamp": ts,
-        })
+    except Exception as e:
+        # Tangkap semua exception agar tidak crash WebSocket
+        print(f"[WebProxy] handle_command error ({command}): {e}")
+        try:
+            await manager.send_to_ws(ws, {
+                "type":    "command_result",
+                "command": command,
+                "success": False,
+                "result":  f"❌ Internal error saat memproses command: {e}",
+                "timestamp": ts,
+            })
+        except Exception:
+            pass
 
 
 # ─── WebSocket Chat Endpoint ───────────────────────────────────────────────────
@@ -559,6 +585,7 @@ async def websocket_chat(
         re-broadcast di sini (chat server sudah mengurus distribusi).
         """
         try:
+            print(f"[WebProxy] Membuka gRPC stream untuk {username}...")
             for response in chat_stub.ChatStream(grpc_message_generator()):
                 msg_data = {
                     "type":      response.msg_type or "message",
@@ -572,10 +599,19 @@ async def websocket_chat(
                     loop
                 )
         except grpc.RpcError as e:
-            grpc_error[0] = str(e)
+            print(f"[WebProxy] gRPC Stream Error ({username}): {e.details()}")
+            # Kirim pesan error ke UI agar user tahu
+            error_msg = {
+                "type": "server_alert",
+                "level": "danger",
+                "message": f"❌ Koneksi Chat Server terputus: {e.details()}",
+                "timestamp": datetime.now().strftime("%H:%M:%S")
+            }
+            asyncio.run_coroutine_threadsafe(manager.send_to_ws(ws, error_msg), loop)
         except Exception as e:
-            grpc_error[0] = str(e)
+            print(f"[WebProxy] Unexpected Error ({username}): {e}")
         finally:
+            print(f"[WebProxy] gRPC stream ditutup untuk {username}")
             stop_event.set()
 
     grpc_thread = threading.Thread(target=run_grpc_stream, daemon=True)
@@ -685,7 +721,7 @@ async def health():
     return {"status": "ok", "services": {
         "user":  "localhost:50052",
         "room":  "localhost:50053",
-        "chat":  "localhost:50051",
+        "chat":  "localhost:50054",
         "proxy": "localhost:8000",
     }, "active_connections": manager.total_connections}
 

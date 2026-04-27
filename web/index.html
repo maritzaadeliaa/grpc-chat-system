@@ -598,9 +598,9 @@ function connectWebSocket(username, room){
       }
 
       if(msg.type==='server_alert'){
-        // Alert tetap dirender di chat & toast
-        renderMessage(msg);
-        toast(msg.message, msg.level==='danger'?'error':'warn', 5000);
+        // Alert dipindahkan ke Activity Log & Toast saja agar chat bersih
+        logActivity(msg.message, msg.level || 'info');
+        toast(msg.message, msg.level==='danger'?'error':'warn', 4000);
         return;
       }
 
