@@ -6,8 +6,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import proto.chat_pb2 as chat_pb2
-import proto.chat_pb2_grpc as chat_pb2_grpc
+import chat_pb2 as chat_pb2
+import chat_pb2_grpc as chat_pb2_grpc
 
 def chat_bot(username="system_bot", room="umum"):
     print(f"[{username}] Start connecting to room '{room}'...")
