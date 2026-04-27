@@ -12,7 +12,7 @@ import proto.chat_pb2_grpc as chat_pb2_grpc
 def chat_bot(username="system_bot", room="umum"):
     print(f"[{username}] Start connecting to room '{room}'...")
     
-    channel = grpc.insecure_channel('localhost:50051')
+    channel = grpc.insecure_channel('localhost:50054')
     stub = chat_pb2_grpc.ChatServiceStub(channel)
     
     # Queue for messages to send
