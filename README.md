@@ -2,66 +2,51 @@
 
 Sistem ini adalah implementasi **Real-Time Chat** berbasis **gRPC** dengan arsitektur Client-Server yang mendukung Multi-Client, dirancang untuk efisiensi koneksi tinggi tanpa kompromi. Dilengkapi pula dengan antarmuka **Web UI (FastAPI Proxy)** yang modern!
 
-## 🚀 Update & Penyempurnaan (Week 9)
-Pada tahap pengembangan ini, sistem telah disempurnakan untuk memenuhi kriteria integrasi sistem yang lebih kompleks:
+## 🚀 Penyempurnaan Sistem (Week 9)
+Proyek ini telah diperbarui untuk memenuhi seluruh **Fitur Wajib** tugas Week 9:
 
-1.  **WebSocket Bridge**: Integrasi penuh antara gRPC Bidirectional Streaming dan WebSocket untuk komunikasi real-time di browser.
-2.  **Event-Driven UI**: Antarmuka dinamis dengan komponen yang berubah otomatis (Grafik Server Monitor, Activity Log, dan Status Indicators).
-3.  **Server-Initiated Events**: Server secara proaktif mendorong data metrics dan alert sistem (seperti notifikasi maintenance) ke browser tanpa request dari client.
-4.  **Command & Control Bridge**: Dukungan perintah teks (prefix `/cmd`) untuk memicu fungsi internal gRPC di backend secara langsung dari UI.
+### 1. Implementasi WebSocket
+*   **Tugas**: Menghubungkan fitur Streaming gRPC ke WebSocket. Data gRPC stream harus tampil otomatis di Web UI.
+*   **Implementasi**: Terletak di `web_proxy.py` pada fungsi `websocket_chat`. Proxy menjembatani `ChatStream` gRPC langsung ke koneksi WebSocket browser secara real-time.
 
----
+### 2. Event-Driven UI
+*   **Tugas**: Minimal 3 komponen UI berubah dinamis berdasarkan pesan WebSocket.
+*   **Implementasi**: 
+    *   **Grafik Server Monitor**: Bar CPU & Memory yang update tiap 5 detik.
+    *   **Activity Log**: Konsol log sistem di bagian atas chat yang mencatat event server.
+    *   **Status Indicators**: Indikator "Live" dan jumlah koneksi aktif yang berubah otomatis.
 
-## Masalah & Solusi
-* **Masalah:** Komunikasi HTTP konvensional lambat dan mengharuskan *refresh* halaman untuk melihat pesan terbaru.
-* **Solusi & Tujuan:** Menggunakan gRPC untuk mendapatkan performa realtime tanpa *delay*, membangun backend yang efisien untuk banyak koneksi sekaligus.
+### 3. Server-Initiated Events
+*   **Tugas**: Server mendorong data secara proaktif tanpa permintaan klien (alert sistem, notifikasi otomatis).
+*   **Implementasi**: Background task `server_metrics_broadcaster` di `web_proxy.py` yang mengirimkan data kesehatan server dan pesan broadcast otomatis (seperti jadwal maintenance) setiap 60 detik ke semua user.
 
-## Mengapa gRPC?
-1. **PROTOBUF:** Data diserialisasi sehingga ukurannya menjadi jauh lebih kecil & lebih cepat dibandingkan format teks seperti JSON.
-2. **BIDIRECTIONAL STREAMING:** Memungkinkan server dan *client* mengirimkan data secara terus-menerus melalui satu koneksi abadi.
-
----
-
-## Pembagian Microservices
-
-Untuk menjaga agar *backend* tetap rapi dan terstruktur, kami membagi sistem menjadi tiga servis utama:
-
-### 1. User Service (Unary RPC) - Port 50052
-* **Fungsi:** Mengelola data pengguna, seperti proses login dan pencatatan status online.
-
-### 2. Room Service (Unary RPC) - Port 50053
-* **Fungsi:** Mengatur ruang obrolan dan menangani instruksi **Command & Control**.
-
-### 3. Chat Service (Bidirectional Streaming) - Port 50054
-* **Fungsi:** Layanan inti yang bertugas melakukan *broadcast* pesan secara *real-time*.
-* *Catatan: Port diubah ke 50054 untuk menghindari konflik port sistem di Windows.*
+### 4. Command & Control Bridge
+*   **Tugas**: Browser mengirim instruksi via WebSocket yang memicu fungsi gRPC di back-end.
+*   **Implementasi**: User dapat menggunakan prefix `/cmd` di kolom chat. Instruksi ini ditangkap oleh Proxy dan diteruskan sebagai pemanggilan RPC ke `RoomService` atau `UserService`.
 
 ---
 
-## State Management & Error Handling
-
-Sistem dibangun agar tahan banting dengan fitur *State Management* (Multi-Client) dan Penanganan Error yang modern:
-
-- **In-Memory Storage:** Menyimpan data secara efisien di RAM untuk respon instan.
-- **Targeted Broadcasting:** Pesan otomatis difilter berdasarkan Room.
-- **Disconnect Detection:** Pembersihan data otomatis saat client terputus untuk menjaga stabilitas.
+## 📹 Panduan Video Presentasi
+Sesuai ketentuan tugas, video presentasi (Max 15 Menit, On-Camera) mencakup:
+1.  **Deskripsi & Arsitektur**: Penjelasan alur dari Browser -> WebSocket -> Proxy -> gRPC Services.
+2.  **Demo Fitur**: Menunjukkan chat real-time, grafik monitor yang bergerak, dan penggunaan perintah `/cmd`.
+3.  **Code Walkthrough**: Penjelasan singkat alur program di `web_proxy.py` (WebSocket bridge) dan `chat_server.py` (gRPC stream).
 
 ---
 
-## Cara Menjalankan Project
+## 🛠️ Pembagian Microservices
+*   **User Service (Port 50052)**: Autentikasi dan login.
+*   **Room Service (Port 50053)**: Manajemen room dan Command & Control.
+*   **Chat Service (Port 50054)**: Bidirectional Chat Streaming.
 
-1.  Install requirements:
-    ```bash
-    pip install -r requirements.txt
-    ```
-2.  Jalankan seluruh sistem (4 service) dengan satu perintah:
-    ```bash
-    python run_all.py
-    ```
-3.  Buka browser di: **http://localhost:8000**
+---
 
-Jika Anda membutuhkan panduan lebih detail mengenai penggunaan Web UI, silakan baca:
-**[PANDUAN_WEB_UI.md](./PANDUAN_WEB_UI.md)**
+## 💻 Cara Menjalankan Project
+1.  Install requirements: `pip install -r requirements.txt`
+2.  Jalankan sistem: `python run_all.py`
+3.  Akses Web UI: **http://localhost:8000**
+
+Panduan penggunaan lebih detail: **[PANDUAN_WEB_UI.md](./PANDUAN_WEB_UI.md)**
 
 ---
 
