@@ -23,10 +23,10 @@ def chat_bot(bot_id, room="umum"):
     
     responses_dict = {
         "halo": [
-            f"Halo juga {0}! Salam kenal ya.",
-            f"Hi {0}! Senang melihatmu aktif di sini.",
-            f"Oit {0}! Apa kabar?",
-            f"Halo {0}, saya Bot siap membantu!"
+            f"Halo juga! Salam kenal ya.",
+            f"Hi! Senang melihatmu aktif di sini.",
+            f"Oit! Apa kabar?",
+            f"Halo, saya Bot siap membantu!"
         ],
         "tugas": [
             "Semangat ngerjain tugasnya! Kamu pasti bisa.",
