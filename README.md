@@ -4,31 +4,31 @@ Sistem ini adalah implementasi **Real-Time Chat** berbasis **gRPC** dengan arsit
 
 ---
 
-## 🚀 Penyempurnaan Sistem (Week 9)
-Proyek ini telah diperbarui untuk memenuhi seluruh **Fitur Wajib** tugas Week 9 mengenai integrasi sistem:
+## 🚀 Penyempurnaan Sistem & Integrasi WebSocket (Week 9)
+Sistem ini telah dimodifikasi untuk memenuhi 4 kriteria wajib tugas mengenai optimalisasi integrasi antara back-end (gRPC) dengan front-end (WebSocket):
 
-### 1. Implementasi WebSocket
-*   **Tugas**: Menghubungkan fitur Streaming gRPC ke WebSocket. Data gRPC stream harus tampil otomatis di Web UI.
-*   **Implementasi**: Terletak di `web_proxy.py` pada fungsi `websocket_chat`. Proxy menjembatani `ChatStream` gRPC langsung ke koneksi WebSocket browser secara real-time.
+### 1. Implementasi WebSocket (Core Requirement)
+*   **Tugas**: Wajib menghubungkan fitur Streaming gRPC yang sudah ada ke WebSocket. Data yang mengalir di gRPC stream harus ditampilkan secara otomatis di Web UI.
+*   **Implementasi Teknis**: Menggunakan **FastAPI WebSocket** di file `web_proxy.py`. Proxy ini secara aktif mendengarkan (`listen`) aliran data dari gRPC *Bidirectional Stream* dan secara otomatis mendorong (*push*) data tersebut ke browser melalui WebSocket tanpa perlu adanya *request* tambahan dari client. Hal ini memastikan data tampil secara otomatis dan real-time di antarmuka Web.
 
 ### 2. Event-Driven UI
-*   **Tugas**: Minimal 3 komponen UI berubah dinamis berdasarkan pesan WebSocket.
+*   **Tugas**: Minimal terdapat 3 komponen di UI yang berubah secara dinamis berdasarkan pesan dari WebSocket.
 *   **Implementasi**: 
-    *   **Grafik Server Monitor**: Bar CPU & Memory yang update tiap 5 detik.
-    *   **Activity Log**: Konsol log sistem di bagian atas chat yang mencatat event server.
-    *   **Status Indicators**: Indikator "Live" dan jumlah koneksi aktif yang berubah otomatis.
+    *   **Grafik Server Monitor**: Bar CPU & Memory yang bereaksi dinamis terhadap pesan metrics dari WebSocket.
+    *   **Activity Log**: Baris log aktivitas yang bertambah secara dinamis saat ada event dari server.
+    *   **Status Indicators**: Status "Live" dan jumlah user aktif yang terupdate secara otomatis.
 
 ### 3. Server-Initiated Events
-*   **Tugas**: Server mendorong data secara proaktif tanpa permintaan klien.
-*   **Implementasi**: Background task `server_metrics_broadcaster` di `web_proxy.py` yang mengirimkan data kesehatan server dan pesan broadcast otomatis secara proaktif.
+*   **Tugas**: Server harus bisa mendorong data secara proaktif ke browser tanpa ada permintaan dari klien (contoh: alert sistem, notifikasi otomatis).
+*   **Implementasi**: Backend memiliki background task proaktif yang mengirimkan metrics kesehatan server dan broadcast notifikasi sistem (alert maintenance) langsung ke browser setiap 60 detik.
 
 ### 4. Command & Control Bridge
-*   **Tugas**: Browser mengirim instruksi via WebSocket yang memicu fungsi gRPC di back-end.
-*   **Implementasi**: User dapat menggunakan prefix `/cmd` (contoh: `/cmd ping_services`) yang akan diproses oleh Proxy dan diteruskan ke backend gRPC.
+*   **Tugas**: Browser harus mampu mengirim instruksi via WebSocket yang secara otomatis memicu pemanggilan fungsi gRPC di layanan back-end.
+*   **Implementasi**: UI mendukung perintah dengan prefix `/cmd`. Saat dikirim, Proxy akan mengeksekusi fungsi gRPC yang sesuai (seperti `GetRoomMembers` atau `PingServices`) dan mengirimkan hasilnya kembali ke browser.
 
 ---
 
-## 📖 Deskripsi Proyek Original
+## 📖 Deskripsi Proyek
 
 ### Masalah & Solusi
 * **Masalah:** Komunikasi HTTP konvensional lambat dan mengharuskan *refresh* halaman untuk melihat pesan terbaru.
@@ -41,32 +41,15 @@ Proyek ini telah diperbarui untuk memenuhi seluruh **Fitur Wajib** tugas Week 9 
 ---
 
 ## 🏗️ Arsitektur & Microservices
-
-Untuk menjaga agar *backend* tetap rapi dan terstruktur, kami membagi sistem menjadi tiga servis utama:
-
-1.  **User Service (Unary RPC) - Port 50052**
-    *   Mengelola data pengguna, seperti proses login, registrasi, dan pencatatan status online.
-2.  **Room Service (Unary RPC) - Port 50053**
-    *   Mengatur ruang obrolan, termasuk pembuatan grup dan pengelolaan keanggotaan pengguna.
-3.  **Chat Service (Bidirectional Streaming) - Port 50054**
-    *   Layanan inti yang bertugas menerima pesan masuk dan melakukan *broadcast* pesan secara *real-time*.
-    *   *Catatan: Port dipindah ke 50054 untuk kompatibilitas Windows (menghindari konflik port 50051).*
+Sistem dibagi menjadi tiga servis utama:
+1.  **User Service (Port 50052)**: Mengelola login dan registrasi.
+2.  **Room Service (Port 50053)**: Mengatur keanggotaan room dan Command & Control.
+3.  **Chat Service (Port 50054)**: Menangani *broadcast* pesan via Bidirectional Streaming.
 
 ---
 
-## 🛡️ State Management & Error Handling
-Sistem dibangun agar tahan banting dengan fitur *State Management* dan Penanganan Error modern:
-- **In-Memory Storage:** Menyimpan daftar user aktif dan koneksi secara dinamis di RAM.
-- **Cleanup Process:** Menghapus data user otomatis saat terputus untuk menjaga stabilitas sistem.
-- **Port Conflict Protection:** Konfigurasi binding `0.0.0.0` untuk memastikan aksesibilitas di sistem Windows.
-
----
-
-## 📹 Panduan Video Presentasi
-Video presentasi (Max 15 Menit) mencakup:
-1.  **Deskripsi & Arsitektur**: Penjelasan integrasi Browser -> WebSocket -> Proxy -> gRPC.
-2.  **Demo Fitur**: Simulasi chat, update grafik monitor, dan penggunaan `/cmd`.
-3.  **Code Walkthrough**: Penjelasan alur gRPC stream dan WebSocket bridge di `web_proxy.py`.
+## 🛡️ State Management
+Sistem menggunakan penyimpanan **In-Memory (RAM)** untuk menjaga kecepatan integrasi real-time. Seluruh tracking koneksi WebSocket dan gRPC stream dikelola secara dinamis di dalam Proxy untuk memastikan data tersinkronisasi antar semua client.
 
 ---
 
@@ -74,25 +57,10 @@ Video presentasi (Max 15 Menit) mencakup:
 1.  Install requirements: `pip install -r requirements.txt`
 2.  Jalankan sistem: `python run_all.py`
 3.  Akses Web UI: **http://localhost:8000**
-4.  Panduan Web UI: **[PANDUAN_WEB_UI.md](./PANDUAN_WEB_UI.md)**
+4.  Panduan Web UI Lengkap: **[PANDUAN_WEB_UI.md](./PANDUAN_WEB_UI.md)**
 
 ---
 
-## 📂 Struktur Folder
-```
-grpc-chat-system/
-├── proto/              # Definisi .proto untuk gRPC
-├── server/             # Kode sumber microservices backend
-│   ├── user_service/   # User server logic
-│   ├── room_service/   # Room & Command logic
-│   └── chat_service/   # Streaming chat logic
-├── web/                # Frontend (HTML/CSS/JS)
-├── web_proxy.py        # Bridge WebSocket <-> gRPC
-├── run_all.py          # Unified launcher script
-└── requirements.txt    # Daftar library Python
-```
-
----
-
-**Oryza Qiara Ramadhani - 084**  
-**Maritza Adelia Sucipto - 111**
+**Disusun Oleh:**
+*   Oryza Qiara Ramadhani - 084
+*   Maritza Adelia Sucipto - 111
