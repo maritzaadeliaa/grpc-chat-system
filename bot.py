@@ -19,13 +19,35 @@ def chat_bot(bot_id, room="umum"):
     
     # Daftarkan bot
     send_queue.put(chat_pb2.ChatMessage(username=username, room=room, msg_type="join"))
-    
     time.sleep(random.uniform(0.5, 2.0))
     
-    # Salam pembuka
-    initial_msgs = ["Halo! Saya bot siap membantu.", "Bot hadir!", "Selamat datang semuanya."]
-    send_queue.put(chat_pb2.ChatMessage(username=username, room=room, message=random.choice(initial_msgs), msg_type="chat"))
-    
+    responses_dict = {
+        "halo": [
+            f"Halo juga {0}! Salam kenal ya.",
+            f"Hi {0}! Senang melihatmu aktif di sini.",
+            f"Oit {0}! Apa kabar?",
+            f"Halo {0}, saya Bot siap membantu!"
+        ],
+        "tugas": [
+            "Semangat ngerjain tugasnya! Kamu pasti bisa.",
+            "Tugas Week 9 emang seru ya, apalagi pakai gRPC.",
+            "Jangan lupa istirahat kalau udah capek ngerjain tugas.",
+            "Butuh bantuan buat tugas? Tanya aja ke asisten dosen hehe."
+        ],
+        "ping": [
+            "Pong! Koneksi aman terkendali.",
+            "Ping received! Latency sangat rendah nih.",
+            "Hadir! gRPC stream lancar jaya.",
+            "Pong! Semua service online."
+        ],
+        "keren": [
+            "Mantap kan? Integrasi sistem emang asik.",
+            "Makasih! Tim pengembangnya hebat nih.",
+            "Yoi! Teknologi gRPC emang masa depan.",
+            "Setuju! Web UI-nya juga estetik banget."
+        ]
+    }
+
     def stream_messages():
         while True:
             yield send_queue.get()
@@ -33,33 +55,29 @@ def chat_bot(bot_id, room="umum"):
     try:
         responses = stub.ChatStream(stream_messages())
         for response in responses:
-            # JANGAN membalas jika pesan berasal dari bot lain (agar tidak looping)
             if response.username.startswith("Bot_") or response.username == username:
                 continue
 
-            # Logika Balas Chat Sederhana
+            # Probabilitas membalas (70% biar tidak semua bot nyaut barengan)
+            if random.random() > 0.7:
+                continue
+
             msg_lower = response.message.lower()
-            reply = ""
+            reply_text = ""
 
-            if "halo" in msg_lower or "hi" in msg_lower:
-                reply = f"Halo juga {response.username}! Senang melihatmu di sini."
-            elif "ping" in msg_lower:
-                reply = "Pong! Koneksi gRPC dari bot sangat stabil."
-            elif "tugas" in msg_lower:
-                reply = "Semangat ngerjain tugas Week 9-nya! Kamu pasti bisa dapat A."
-            elif "siapa" in msg_lower:
-                reply = f"Saya adalah Bot nomor {bot_id}, asisten virtual untuk demo gRPC ini."
-            elif "keren" in msg_lower or "mantap" in msg_lower:
-                reply = "Terima kasih! Ini semua berkat integrasi gRPC dan WebSocket."
+            for key, variations in responses_dict.items():
+                if key in msg_lower:
+                    reply_text = random.choice(variations).format(response.username)
+                    break
+            
+            if "siapa" in msg_lower:
+                reply_text = f"Saya Bot_{bot_id}. Saya di sini untuk menemani kamu di room {room}."
 
-            if reply:
-                # Beri jeda sedikit agar terlihat natural seperti mengetik
-                time.sleep(random.uniform(1.0, 2.5))
+            if reply_text:
+                # Simulasi waktu mengetik
+                time.sleep(random.uniform(1.0, 3.0))
                 send_queue.put(chat_pb2.ChatMessage(
-                    username=username,
-                    room=room,
-                    message=reply,
-                    msg_type="chat"
+                    username=username, room=room, message=reply_text, msg_type="chat"
                 ))
 
     except Exception as e:
@@ -70,15 +88,12 @@ if __name__ == "__main__":
     target_room = "umum"
 
     if len(sys.argv) > 1:
-        try:
-            num_bots = int(sys.argv[1])
+        try: num_bots = int(sys.argv[1])
         except ValueError: pass
     
-    if len(sys.argv) > 2:
-        target_room = sys.argv[2]
+    if len(sys.argv) > 2: target_room = sys.argv[2]
 
-    print(f"--- Menjalankan {num_bots} Bot Interaktif di room '{target_room}' ---")
-    print("Bot akan merespon kata: 'halo', 'ping', 'tugas', 'siapa', 'keren'")
+    print(f"--- Menjalankan {num_bots} Bot Variatif di room '{target_room}' ---")
     
     for i in range(1, num_bots + 1):
         threading.Thread(target=chat_bot, args=(i, target_room), daemon=True).start()
