@@ -39,6 +39,12 @@ SERVICES = [
         "port": 8000,
         "color": "\033[32m",  # Green
     },
+    {
+        "name": "System Bot",
+        "cmd": [sys.executable, "bot.py"],
+        "port": "N/A",
+        "color": "\033[34m",  # Blue
+    },
 ]
 
 RESET = "\033[0m"
