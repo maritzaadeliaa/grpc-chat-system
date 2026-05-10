@@ -10,3 +10,9 @@
 1778406273: Opening ipv4 listen socket on port 9001.
 1778406273: Opening ipv6 listen socket on port 9001.
 1778406273: mosquitto version 2.1.2 running
+1778406296: New connection from 172.19.0.1:33742 on port 1883.
+1778406296: New client connected from 172.19.0.1:33742 as auto-B94C69A3-1C02-99F4-E8C5-8C59D0247545 (p5, c1, k60).
+1778406595: Client auto-B94C69A3-1C02-99F4-E8C5-8C59D0247545 [172.19.0.1:33742] disconnected: connection closed by client.
+1778406602: New connection from 172.19.0.1:49412 on port 1883.
+1778406602: New client connected from 172.19.0.1:49412 as auto-7A9498D1-1C32-704A-17D2-524B69F5F360 (p5, c1, k60).
+1778406916: Client auto-7A9498D1-1C32-704A-17D2-524B69F5F360 [172.19.0.1:49412] disconnected: connection closed by client.
