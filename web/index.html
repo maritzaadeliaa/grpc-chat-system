@@ -584,7 +584,7 @@ function connectWebSocket(username, room){
 
   ws.onopen=()=>{
     setConn('connected');
-    chatRoomStatus.textContent='Connected · gRPC ↔ WebSocket';
+    chatRoomStatus.textContent='Connected · MQTT ↔ WebSocket';
     logActivity(`WebSocket terhubung ke room "${room}"`, 'ok');
     toast(`Terhubung ke room "${room}"`, 'success');
   };
