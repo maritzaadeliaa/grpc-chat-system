@@ -1,113 +1,105 @@
 import grpc
+import chat_pb2 as chat_pb2
+import chat_pb2_grpc as chat_pb2_grpc
 import time
 import threading
 import sys
 import os
+import random
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-import chat_pb2
-import chat_pb2_grpc
-
-def chat_bot(username="system_bot", room="umum"):
-    print(f"[{username}] Start connecting to room '{room}'...")
+def chat_bot(bot_id, room="umum"):
+    username = f"Bot_{bot_id}"
+    print(f"[{username}] Memulai koneksi ke room '{room}'...")
     
-    channel = grpc.insecure_channel('localhost:50051')
+    channel = grpc.insecure_channel('localhost:50054')
     stub = chat_pb2_grpc.ChatServiceStub(channel)
     
-    # Queue for messages to send
     import queue
     send_queue = queue.Queue()
     
-    # Send join message immediately to register
-    send_queue.put(chat_pb2.ChatMessage(
-        username=username,
-        room=room,
-        msg_type="join"
-    ))
+    # Daftarkan bot
+    send_queue.put(chat_pb2.ChatMessage(username=username, room=room, msg_type="join"))
+    time.sleep(random.uniform(0.5, 2.0))
     
-    # Send a greeting message
-    time.sleep(1)
-    send_queue.put(chat_pb2.ChatMessage(
-        username=username,
-        room=room,
-        message="Halo! Saya System Bot. Ketik /help untuk melihat daftar perintah.",
-        msg_type="message"
-    ))
+    responses_dict = {
+        "halo": [
+            f"Halo juga! Salam kenal ya.",
+            f"Hi! Senang melihatmu aktif di sini.",
+            f"Oit! Apa kabar?",
+            f"Halo, saya Bot siap membantu!"
+        ],
+        "tugas": [
+            "Semangat ngerjain tugasnya! Kamu pasti bisa.",
+            "Tugas Week 9 emang seru ya, apalagi pakai gRPC.",
+            "Jangan lupa istirahat kalau udah capek ngerjain tugas.",
+            "Butuh bantuan buat tugas? Tanya aja ke asisten dosen hehe."
+        ],
+        "ping": [
+            "Pong! Koneksi aman terkendali.",
+            "Ping received! Latency sangat rendah nih.",
+            "Hadir! gRPC stream lancar jaya.",
+            "Pong! Semua service online."
+        ],
+        "keren": [
+            "Mantap kan? Integrasi sistem emang asik.",
+            "Makasih! Tim pengembangnya hebat nih.",
+            "Yoi! Teknologi gRPC emang masa depan.",
+            "Setuju! Web UI-nya juga estetik banget."
+        ]
+    }
 
-    def msg_generator():
+    def stream_messages():
         while True:
-            msg = send_queue.get()
-            if msg is None:
-                break
-            # set timestamp
-            from datetime import datetime
-            msg.timestamp = datetime.now().strftime("%H:%M:%S")
-            yield msg
-
-    def process_responses():
-        try:
-            for response in stub.ChatStream(msg_generator()):
-                if response.msg_type in ("typing", "join"):
-                    continue
-                
-                # Ignore my own messages
-                if response.username == username:
-                    continue
-                
-                text = response.message.strip()
-                
-                # Profanity filter placeholder
-                bad_words = ["jelek", "bodoh", "kasar"]
-                for w in bad_words:
-                    if w in text.lower():
-                        send_queue.put(chat_pb2.ChatMessage(
-                            username=username,
-                            room=room,
-                            message=f"@{response.username} Tolong jaga bahasa Anda di room ini!",
-                            msg_type="message"
-                        ))
-                        break
-
-                # Commands
-                if text.startswith("/help"):
-                    send_queue.put(chat_pb2.ChatMessage(
-                        username=username,
-                        room=room,
-                        message="Daftar perintah:\n/help - Menampilkan pesan ini\n/cuaca - Cek cuaca hari ini\n/waktu - Cek waktu server",
-                        msg_type="message"
-                    ))
-                elif text.startswith("/cuaca"):
-                    send_queue.put(chat_pb2.ChatMessage(
-                        username=username,
-                        room=room,
-                        message="☔ Perkiraan cuaca: Hujan deras algoritma di server ini.",
-                        msg_type="message"
-                    ))
-                elif text.startswith("/waktu"):
-                    from datetime import datetime
-                    send_queue.put(chat_pb2.ChatMessage(
-                        username=username,
-                        room=room,
-                        message=f"🕒 Waktu server saat ini: {datetime.now().strftime('%H:%M:%S')}",
-                        msg_type="message"
-                    ))
-        except grpc.RpcError as e:
-            print(f"[{username}] Kesalahan gRPC: {e.details()}")
-        except Exception as e:
-            print(f"[{username}] Terjadi kesalahan: {e}")
+            yield send_queue.get()
 
     try:
-        process_responses()
-    except KeyboardInterrupt:
-        print(f"[{username}] Bot dimatikan.")
-        send_queue.put(None)
+        responses = stub.ChatStream(stream_messages())
+        for response in responses:
+            if response.username.startswith("Bot_") or response.username == username:
+                continue
+
+            # Probabilitas membalas (70% biar tidak semua bot nyaut barengan)
+            if random.random() > 0.7:
+                continue
+
+            msg_lower = response.message.lower()
+            reply_text = ""
+
+            for key, variations in responses_dict.items():
+                if key in msg_lower:
+                    reply_text = random.choice(variations).format(response.username)
+                    break
+            
+            if "siapa" in msg_lower:
+                reply_text = f"Saya Bot_{bot_id}. Saya di sini untuk menemani kamu di room {room}."
+
+            if reply_text:
+                # Simulasi waktu mengetik
+                time.sleep(random.uniform(1.0, 3.0))
+                send_queue.put(chat_pb2.ChatMessage(
+                    username=username, room=room, message=reply_text, msg_type="chat"
+                ))
+
+    except Exception as e:
+        print(f"[{username}] Terputus: {e}")
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description="Jalankan System Bot gRPC")
-    parser.add_argument("--room", default="umum", help="Nama room yang akan dijaga")
-    parser.add_argument("--name", default="system_bot", help="Nama bot")
-    args = parser.parse_args()
+    num_bots = 1
+    target_room = "umum"
+
+    if len(sys.argv) > 1:
+        try: num_bots = int(sys.argv[1])
+        except ValueError: pass
     
-    chat_bot(args.name, args.room)
+    if len(sys.argv) > 2: target_room = sys.argv[2]
+
+    print(f"--- Menjalankan {num_bots} Bot Variatif di room '{target_room}' ---")
+    
+    for i in range(1, num_bots + 1):
+        threading.Thread(target=chat_bot, args=(i, target_room), daemon=True).start()
+        time.sleep(0.3)
+
+    try:
+        while True: time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n--- Semua bot dimatikan ---")

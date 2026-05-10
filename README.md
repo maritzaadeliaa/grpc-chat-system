@@ -1,25 +1,46 @@
 # Implementasi Real-Time Chat Berbasis gRPC
 
-Sistem ini adalah implementasi **Real-Time Chat** berbasis gRPC dengan arsitektur **Client-Server** yang mendukung **Multi-Client**, dirancang untuk efisiensi koneksi tinggi tanpa kompromi. Dilengkapi pula dengan antarmuka **Web UI (FastAPI Proxy)** yang modern!
+Sistem ini adalah implementasi **Real-Time Chat** berbasis **gRPC** dengan arsitektur **Client-Server** yang mendukung **Multi-Client**, dirancang untuk efisiensi koneksi tinggi tanpa kompromi. Dilengkapi pula dengan antarmuka **Web UI (FastAPI Proxy)** yang modern!
 
 ---
 
-## Masalah & Solusi
+## 🚀 Penyempurnaan Sistem (Week 9)
+Proyek ini telah diperbarui untuk memenuhi seluruh **Fitur Wajib** tugas Week 9 mengenai integrasi sistem:
 
-**Masalah:** Komunikasi HTTP konvensional lambat dan mengharuskan refresh halaman untuk melihat pesan terbaru.
+### 1. Implementasi WebSocket (Core Requirement)
+*   **Tugas**: Wajib menghubungkan fitur Streaming gRPC yang sudah ada ke WebSocket. Data yang mengalir di gRPC stream harus ditampilkan secara otomatis di Web UI.
+*   **Implementasi**: Terletak di `web_proxy.py` pada fungsi `websocket_chat`. Proxy menjembatani `ChatStream` gRPC langsung ke koneksi WebSocket browser secara real-time.
 
-**Solusi & Tujuan:** Menggunakan gRPC untuk mendapatkan performa realtime tanpa delay, membangun backend yang efisien untuk banyak koneksi sekaligus.
+### 2. Event-Driven UI
+*   **Tugas**: Minimal terdapat 3 komponen di UI yang berubah secara dinamis berdasarkan pesan dari WebSocket.
+*   **Implementasi**: 
+    *   **Grafik Server Monitor**: Bar CPU & Memory yang update tiap 5 detik.
+    *   **Activity Log**: Konsol log sistem di bagian atas chat yang mencatat event server.
+    *   **Status Indicators**: Indikator "Live" dan jumlah koneksi aktif yang berubah otomatis.
+
+### 3. Server-Initiated Events
+*   **Tugas**: Server harus bisa mendorong data secara proaktif ke browser tanpa ada permintaan dari klien (contoh: alert sistem, notifikasi otomatis).
+*   **Implementasi**: Background task `server_metrics_broadcaster` di `web_proxy.py` yang mengirimkan data kesehatan server dan pesan broadcast otomatis secara proaktif.
+
+### 4. Command & Control Bridge
+*   **Tugas**: Browser harus mampu mengirim instruksi via WebSocket yang secara otomatis memicu pemanggilan fungsi gRPC di layanan back-end.
+*   **Implementasi**: User dapat menggunakan prefix `/cmd` (contoh: `/cmd ping_services`) yang akan diproses oleh Proxy dan diteruskan ke backend gRPC.
 
 ---
 
-## Mengapa gRPC?
+## 📖 Deskripsi Proyek Original
 
+### Masalah & Solusi
+* **Masalah:** Komunikasi HTTP konvensional lambat dan mengharuskan *refresh* halaman untuk melihat pesan terbaru.
+* **Solusi & Tujuan:** Menggunakan gRPC untuk mendapatkan performa realtime tanpa *delay*, membangun backend yang efisien untuk banyak koneksi sekaligus.
+
+### Mengapa gRPC?
 - **PROTOBUF:** Data diserialisasi sehingga ukurannya menjadi jauh lebih kecil & lebih cepat dibandingkan format teks seperti JSON.
 - **BIDIRECTIONAL STREAMING:** Memungkinkan server dan client mengirimkan data secara terus-menerus melalui satu koneksi abadi.
 
 ---
 
-## Arsitektur Sistem
+## 🏗️ Arsitektur Sistem
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -37,91 +58,97 @@ Sistem ini adalah implementasi **Real-Time Chat** berbasis gRPC dengan arsitektu
 ┌───────▼┐ ┌───▼───┐ ┌▼──────────┐
 │  User  │ │  Room │ │   Chat    │
 │Service │ │Service│ │  Service  │
-│:50052  │ │:50053 │ │  :50051   │
+│:50052  │ │:50053 │ │  :50054   │
 └────────┘ └───────┘ └───────────┘
 ```
 
 ---
 
-## Pembagian Microservices
+## 🛠️ Pembagian Microservices
 
 Untuk menjaga agar backend tetap rapi dan terstruktur, sistem dibagi menjadi tiga servis utama:
 
-### 1. User Service (Unary RPC)
+### 1. User Service (Unary RPC) - Port 50052
 - **Fungsi:** Mengelola data pengguna, seperti proses login, registrasi, dan pencatatan status online/offline.
 - **Implementasi Kode:** `server/user_service/user_server.py` dan `proto/user.proto`
-- **Alur:** Digunakan pada **LANGKAH 1 (LOGIN)**.
 
-### 2. Room Service (Unary RPC)
+### 2. Room Service (Unary RPC) - Port 50053
 - **Fungsi:** Mengatur ruang obrolan, termasuk pembuatan grup dan pengelolaan keanggotaan pengguna.
 - **Implementasi Kode:** `server/room_service/room_server.py` dan `proto/room.proto`
-- **Alur:** Digunakan pada **LANGKAH 2 (JOIN ROOM)**. Mendukung Personal Chat (1-on-1) maupun Group Chat.
 
-### 3. Chat Service (Bidirectional Streaming)
+### 3. Chat Service (Bidirectional Streaming) - Port 50054
 - **Fungsi:** Layanan inti yang bertugas menerima pesan masuk dan melakukan broadcast ke penerima yang tepat secara real-time.
 - **Implementasi Kode:** `server/chat_service/chat_server.py` dan `proto/chat.proto`
-- **Alur:** Digunakan pada **LANGKAH 3 (KIRIM CHAT)**.
+- *Catatan: Port dipindahkan ke 50054 untuk menghindari konflik sistem.*
 
 ---
 
-## State Management & Error Handling
+## 🛡️ State Management & Error Handling
 
 Sistem dibangun agar tahan banting dengan fitur **State Management (Multi-Client)** dan **Penanganan Error** yang modern:
 
 - **In-Memory Storage & Connection Tracking:** Menyimpan daftar user aktif dan mencatat koneksi tiap user secara dinamis menggunakan dictionary pool antrean utas di memori sistem.
 - **Targeted Broadcasting:** Pesan otomatis difilter sehingga hanya dikirim kepada user yang berada dalam Room yang sama.
-- **Disconnect Detection:** Mendeteksi client Web atau CLI yang terputus statusnya (`context.is_active()`).
-- **Cleanup Process:** Menghapus overhead (seperti Logout & Queue deletion) secara mulus pada server ketika terputus untuk menjaga System Stability.
+- **Cleanup Process:** Menghapus overhead secara mulus pada server ketika terputus untuk menjaga System Stability.
 
-> **Catatan:** Sistem ini menggunakan penyimpanan **In-Memory (RAM)** — data pesan, user, dan room tidak disimpan ke database. Semua data akan hilang ketika server di-restart. Ini adalah desain yang disengaja untuk menjaga sistem tetap ringan dan fokus pada demonstrasi gRPC Streaming.
-
----
-
-## Cara Menjalankan Project
-
-Jika Anda ingin menjalankan layanan secara lokal, bacalah panduannya di: **[PANDUAN_WEB_UI.md](PANDUAN_WEB_UI.md)**
-
-Panduan tersebut mencakup instalasi requirements, eksekusi ketiga backend microservice di atas, serta pengoperasian proxy UI Web-nya.
+> **Catatan:** Sistem ini menggunakan penyimpanan **In-Memory (RAM)** — data pesan, user, dan room tidak disimpan ke database. Ini adalah desain yang disengaja untuk menjaga sistem tetap ringan dan fokus pada demonstrasi gRPC Streaming.
 
 ---
 
-## Fitur
+## 💻 Cara Menjalankan Project
 
-- ✅ **Real-time chat** via gRPC Bidirectional Streaming
-- ✅ **Multi-room** — bisa join beberapa room sekaligus
-- ✅ **Web UI** — antarmuka browser modern (dark mode)
-- ✅ **CLI Client** — send & receive secara bersamaan (threading)
-- ✅ **Auto-cleanup** — user/room otomatis dihapus saat disconnect
-- ✅ **Login/Logout** — tracking user aktif
+1.  **Install requirements**: `pip install -r requirements.txt`
+2.  **Jalankan Sistem**: `python run_all.py` (Menyalakan 4 service sekaligus).
+3.  **Akses Web UI**: **http://localhost:8000**
+4.  **Panduan Detail**: **[PANDUAN_WEB_UI.md](PANDUAN_WEB_UI.md)**
 
 ---
 
-## Struktur Proyek
-
+## 📂 Struktur Proyek
 ```
 grpc-chat-system/
-├── proto/
-│   ├── user.proto          # Definisi UserService
-│   ├── room.proto          # Definisi RoomService
-│   └── chat.proto          # Definisi ChatService (Bidirectional Stream)
-├── server/
-│   ├── user_service/
-│   │   └── user_server.py  # Login/Logout (Port 50052)
-│   ├── room_service/
-│   │   └── room_server.py  # Join/Leave Room (Port 50053)
-│   └── chat_service/
-│       └── chat_server.py  # Bidirectional Chat Stream (Port 50051)
-├── client/
-│   └── client.py           # CLI Client dengan threading
-├── web/
-│   └── index.html          # Web UI
-├── web_proxy.py            # FastAPI proxy (HTTP/WS <-> gRPC)
-├── run_all.py              # Launcher semua service
-├── requirements.txt
-└── README.md
+├── proto/              # Definisi Protokol gRPC
+├── server/             # Backend Services
+│   ├── user_service/   # Port 50052
+│   ├── room_service/   # Port 50053
+│   └── chat_service/   # Port 50054
+├── client/             # CLI Client
+├── web/                # Frontend Web
+├── web_proxy.py        # Bridge WebSocket <-> gRPC
+├── run_all.py          # Launcher Otomatis
+└── requirements.txt    # Library Dependencies
 ```
 
 ---
 
 **Oryza Qiara Ramadhani - 084**  
 **Maritza Adelia Sucipto - 111**
+
+---
+
+## 📡 Tugas Orang 1: Fondasi MQTT & Web Proxy Bridge
+
+Bagian ini merupakan tugas "Orang 1" dalam mengintegrasikan sistem dengan MQTT sebagai pengganti gRPC streaming utama untuk fitur chat.
+
+### Fitur yang Diimplementasikan (Orang 1):
+1. **MQTT Broker Setup**: Menggunakan Eclipse Mosquitto dengan konfigurasi `docker-compose.yml`.
+2. **Web Proxy MQTT Bridge**: Menghapus koneksi gRPC `ChatService` di Web Proxy dan menggantinya dengan inisiasi MQTT Client (`paho-mqtt` v5) yang menjembatani koneksi WebSocket ke MQTT secara asinkron (Pub/Sub).
+3. **Topic Alias**: Mengaktifkan fitur Topic Alias pada MQTT v5 untuk menghemat bandwidth (proxy tidak mengirim string topik secara berulang).
+4. **User Properties**: Metadata seperti `username` dan `msg_type` ("join", "message") tidak lagi diletakkan dalam payload JSON, melainkan disisipkan pada header spesifik (User Properties) MQTT v5.
+
+### Cara Menjalankan (Step-by-Step):
+1. Pastikan **Docker** sudah terinstal dan berjalan.
+2. Nyalakan broker MQTT (Mosquitto) melalui terminal:
+   ```bash
+   docker-compose up -d
+   ```
+3. Install modul MQTT Python:
+   ```bash
+   pip install paho-mqtt
+   ```
+4. Jalankan sistem (User Service, Room Service, & Web Proxy):
+   ```bash
+   python run_all.py
+   ```
+5. Buka web UI di browser: **http://localhost:8000**
+6. Untuk menguji: Buka 2 tab/browser berbeda, login dengan user yang berbeda, lalu masuk ke nama room yang sama. Coba mengirim pesan untuk membuktikan MQTT bridge berjalan sempurna.
