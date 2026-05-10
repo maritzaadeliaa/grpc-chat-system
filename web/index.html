@@ -362,7 +362,28 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);height
       <div id="typing-indicator">💬 sedang mengetik…</div>
 
       <div class="input-area">
-        <div class="cmd-hint">Ketik <code>/cmd get_members</code> · <code>/cmd ping_services</code> · <code>/cmd broadcast &lt;pesan&gt;</code></div>
+        <div class="cmd-hint">Ketik <code>/cmd get_members</code> · <code>/cmd ping_services</code> · <code>/cmd broadcast &lt;pesan&gt;</code> atau <code>/bot &lt;perintah&gt;</code></div>
+        <div class="mqtt-settings" style="display: flex; gap: 15px; margin-bottom: 8px; font-size: 11px; align-items: center; color: var(--txt2);">
+          <label style="display:flex; align-items:center; gap:4px;" title="Quality of Service (Orang 2)">
+            QoS: 
+            <select id="mqtt-qos" style="background:var(--input); color:var(--txt); border:1px solid var(--border); border-radius:4px; padding:2px;">
+              <option value="0">0 (At most once)</option>
+              <option value="1" selected>1 (At least once)</option>
+              <option value="2">2 (Exactly once)</option>
+            </select>
+          </label>
+          <label style="display:flex; align-items:center; gap:4px;" title="Pin pesan di room ini (Orang 2)">
+            <input type="checkbox" id="mqtt-retain" /> Pin Message
+          </label>
+          <label style="display:flex; align-items:center; gap:4px;" title="Hapus pesan dari antrean jika tak tersampaikan (Orang 3)">
+            Expiry:
+            <select id="mqtt-expiry" style="background:var(--input); color:var(--txt); border:1px solid var(--border); border-radius:4px; padding:2px;">
+              <option value="0">Never</option>
+              <option value="10">10 Detik</option>
+              <option value="60">1 Menit</option>
+            </select>
+          </label>
+        </div>
         <div class="input-form">
           <div class="msg-input-wrapper">
             <textarea id="msg-input" placeholder="Ketik pesan atau /cmd … (Enter kirim)" rows="1"></textarea>
@@ -537,10 +558,12 @@ function renderMessage(msg){
   const el=document.createElement('div');
   el.className=`msg-wrapper${isSelf?' self':''}`;
   const color=avatarColor(msg.username);
+  const pinBadge = msg.is_pin ? '<span style="font-size:9px; background:var(--warn); color:#000; padding:1px 4px; border-radius:4px; margin-left:6px; font-weight:bold;">📌 PINNED</span>' : '';
+  
   el.innerHTML=`
     <div class="msg-avatar" style="background:${color}">${initials(msg.username)}</div>
     <div class="msg-content">
-      ${!isSelf?`<div class="msg-name">${msg.username}</div>`:''}
+      ${!isSelf?`<div class="msg-name">${msg.username}${pinBadge}</div>`: (msg.is_pin ? `<div class="msg-name" style="text-align:right">${pinBadge}</div>` : '')}
       <div class="msg-bubble">${esc(msg.message)}</div>
       <div class="msg-time">${msg.timestamp||''}</div>
     </div>`;
@@ -666,8 +689,20 @@ function sendMessage(){
   }
 
   if(!state.ws || state.ws.readyState!==WebSocket.OPEN){toast('Tidak terhubung','error');return;}
-  state.ws.send(JSON.stringify({message:text}));
+  
+  const qos = parseInt($('mqtt-qos').value, 10) || 0;
+  const retain = $('mqtt-retain').checked;
+  const expiry = parseInt($('mqtt-expiry').value, 10) || 0;
+  
+  state.ws.send(JSON.stringify({
+      message: text,
+      qos: qos,
+      retain: retain,
+      expiry: expiry
+  }));
+  
   msgInput.value=''; msgInput.style.height='auto';
+  $('mqtt-retain').checked = false; // Reset retain setelah kirim
 }
 
 // ── Room Switching ─────────────────────────────────────────────────────────

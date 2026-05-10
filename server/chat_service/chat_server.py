@@ -1,117 +1,105 @@
-import grpc
-from concurrent import futures
 import time
-import queue
-import threading
-import sys
-import os
+import json
+import paho.mqtt.client as mqtt
+from paho.mqtt.properties import Properties
+from paho.mqtt.packettypes import PacketTypes
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
 
-import chat_pb2
-import chat_pb2_grpc
+# Daftar command bot
+def process_bot_command(command, user_id):
+    command = command.lower().strip()
+    if command == "help":
+        return "Perintah tersedia: help, ping, time"
+    elif command == "ping":
+        return "Pong!"
+    elif command == "time":
+        from datetime import datetime
+        return f"Waktu server: {datetime.now().strftime('%H:%M:%S')}"
+    else:
+        return f"Perintah '{command}' tidak dikenal."
 
-# { room_name: { username: Queue } }
-clients = {}
-lock = threading.Lock()
+def on_connect(client, userdata, flags, rc, properties=None):
+    if rc == 0:
+        print("[ChatWorker] Terhubung ke MQTT Broker!")
+        
+        # Subscribe ke shared subscription untuk analitik/log
+        # $share/chat_workers/chat/room/# 
+        # (Orang 2 - Wildcard & Shared Subscription)
+        client.subscribe("$share/chat_workers/chat/room/#", qos=1)
+        print("[ChatWorker] Subscribed to shared topic: $share/chat_workers/chat/room/#")
+        
+        # Subscribe ke topic request-response untuk bot
+        # (Orang 3 - Request-Response)
+        client.subscribe("chat/request/bot", qos=1)
+        print("[ChatWorker] Subscribed to request topic: chat/request/bot")
+    else:
+        print(f"[ChatWorker] Gagal connect MQTT, rc={rc}")
 
+def on_message(client, userdata, msg):
+    topic = msg.topic
+    
+    try:
+        # Analitik & Log (Dari shared subscription)
+        if topic.startswith("chat/room/"):
+            room = topic.split("/")[-1]
+            payload = json.loads(msg.payload.decode())
+            
+            # Abaikan pesan 'typing' atau 'join' agar log tidak terlalu penuh
+            msg_type = payload.get("type", "message")
+            if msg_type == "message":
+                username = payload.get("username", "Unknown")
+                text = payload.get("message", "")
+                print(f"[Analytic Log] Room: {room} | {username}: {text}")
 
-class ChatService(chat_pb2_grpc.ChatServiceServicer):
-
-    def ChatStream(self, request_iterator, context):
-        q = queue.Queue()
-        username = None
-        user_room = None
-
-        def receive_messages():
-            nonlocal username, user_room
-
-            try:
-                for message in request_iterator:
-                    if not message.username or not message.room:
-                        continue
-
-                    username = message.username
-                    user_room = message.room
-
-                    # ── Registrasi ke room (selalu, termasuk saat join) ──
-                    with lock:
-                        if user_room not in clients:
-                            clients[user_room] = {}
-                        if username not in clients[user_room]:
-                            clients[user_room][username] = q
-                            print(f"[ChatService] {username} terdaftar di room '{user_room}'")
-
-                    # ── Join signal: hanya register, tidak di-broadcast ──
-                    if message.msg_type == "join":
-                        continue
-
-                    # ── Typing: broadcast tapi log ringkas ──
-                    if message.msg_type == "typing":
-                        with lock:
-                            for user, cq in list(clients.get(user_room, {}).items()):
-                                if user != username:   # jangan kirim balik ke pengirim
-                                    cq.put(message)
-                        continue
-
-                    # ── Pesan biasa: log + broadcast ke semua termasuk pengirim ──
-                    print(f"[ChatService] [{user_room}] {username}: {message.message}")
-                    with lock:
-                        for user, cq in list(clients.get(user_room, {}).items()):
-                            cq.put(message)
-
-            except Exception as e:
-                print(f"[ChatService] receive error: {e}")
-            finally:
-                with lock:
-                    if user_room and username:
-                        if user_room in clients and username in clients[user_room]:
-                            del clients[user_room][username]
-                            print(f"[ChatService] {username} keluar dari '{user_room}'")
-                        if user_room in clients and not clients[user_room]:
-                            del clients[user_room]
-                q.put(None)
-
-        t = threading.Thread(target=receive_messages, daemon=True)
-        t.start()
-
-        try:
-            while context.is_active():
-                try:
-                    message = q.get(timeout=1.0)
-                    if message is None:
-                        break
-                    yield message
-                except queue.Empty:
-                    continue
-        except Exception as e:
-            print(f"[ChatService] stream error: {e}")
-        finally:
-            with lock:
-                if user_room and username:
-                    if user_room in clients and username in clients[user_room]:
-                        del clients[user_room][username]
-                    if user_room in clients and not clients[user_room]:
-                        del clients[user_room]
-            print(f"[ChatService] Stream selesai untuk {username}")
-
+        # Request-Response Bot
+        elif topic == "chat/request/bot":
+            payload = json.loads(msg.payload.decode())
+            command = payload.get("command", "")
+            user_id = payload.get("user_id", "Unknown")
+            
+            print(f"[ChatWorker] Menerima request bot dari {user_id}: {command}")
+            
+            # Cek ResponseTopic dari properti (MQTTv5)
+            props = getattr(msg, "properties", None)
+            if props and hasattr(props, "ResponseTopic") and props.ResponseTopic:
+                response_topic = props.ResponseTopic
+                response_text = process_bot_command(command, user_id)
+                
+                # Kirim balasan ke ResponseTopic
+                reply_payload = json.dumps({
+                    "message": f"🤖 Bot: {response_text}",
+                    "type": "bot_response"
+                })
+                client.publish(response_topic, reply_payload, qos=1)
+                print(f"[ChatWorker] Mengirim balasan bot ke {response_topic}")
+            else:
+                print(f"[ChatWorker] Peringatan: Tidak ada ResponseTopic dari {user_id}")
+                
+    except Exception as e:
+        print(f"[ChatWorker] Error processing message: {e}")
 
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
-    chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatService(), server)
-    # Gunakan 0.0.0.0 agar lebih stabil di Windows (kompatibilitas IPv4/v6)
-    server.add_insecure_port('0.0.0.0:50054')
-    server.start()
-    print("=" * 40)
-    print("[OK] Chat Server running on port 50054")
-    print("=" * 40)
+    print("========================================")
+    print("🚀 Memulai ChatWorker (MQTT Daemon)...")
+    print("========================================")
+    
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv5)
+    
+    # Konfigurasi Receive Maximum (Orang 3 - Flow Control / Backpressure)
+    # Membatasi jumlah pesan unacknowledged untuk mensimulasikan backpressure
+    connect_props = Properties(PacketTypes.CONNECT)
+    connect_props.ReceiveMaximum = 10  # Maksimal 10 pesan sebelum di-acknowledge
+    
+    client.on_connect = on_connect
+    client.on_message = on_message
+    
     try:
-        while True:
-            time.sleep(86400)
-    except KeyboardInterrupt:
-        server.stop(0)
-        print("\n[ChatService] Server stopped.")
+        client.connect(MQTT_BROKER, MQTT_PORT, 60, properties=connect_props)
+        client.loop_forever()
+    except Exception as e:
+        print(f"[ChatWorker] Terjadi kesalahan: {e}")
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     serve()

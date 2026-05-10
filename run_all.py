@@ -26,12 +26,12 @@ SERVICES = [
         "port": 50053,
         "color": "\033[33m",  # Yellow
     },
-    # {
-    #     "name": "Chat Service",
-    #     "cmd": [sys.executable, "-m", "server.chat_service.chat_server"],
-    #     "port": 50054,
-    #     "color": "\033[35m",  # Magenta
-    # },
+    {
+        "name": "Chat Worker",
+        "cmd": [sys.executable, "-m", "server.chat_service.chat_server"],
+        "port": "MQTT Worker",
+        "color": "\033[35m",  # Magenta
+    },
     {
         "name": "Web Proxy",
         "cmd": [sys.executable, "-m", "uvicorn", "web_proxy:app",

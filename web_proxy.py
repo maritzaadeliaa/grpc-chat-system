@@ -130,6 +130,9 @@ mqtt_loop: asyncio.AbstractEventLoop = None
 def on_mqtt_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print("[WebProxy] Terhubung ke MQTT Broker!")
+        # Subscribe ke topic LWT (Orang 3)
+        client.subscribe("alert/system")
+        
         # Re-subscribe ke semua room aktif jika reconnect
         for room in subscribed_rooms:
             client.subscribe(f"chat/room/{room}")
@@ -145,6 +148,34 @@ def on_mqtt_message(client, userdata, msg):
         return
         
     topic = msg.topic
+    
+    # ── LWT Alert (Orang 3) ──
+    if topic == "alert/system":
+        try:
+            payload = json.loads(msg.payload.decode())
+            asyncio.run_coroutine_threadsafe(
+                manager.broadcast_to_all(payload),
+                mqtt_loop
+            )
+        except Exception as e:
+            print(f"[WebProxy] Gagal parse LWT message: {e}")
+        return
+
+    # ── Bot Response (Orang 3) ──
+    if topic.startswith("chat/response/"):
+        username = topic.split("/")[-1]
+        try:
+            payload = json.loads(msg.payload.decode())
+            # Cari websocket user ini dan kirim
+            # Kita broadcast ke semua room, tapi frontend/manager bisa difilter (untuk simplifikasi, kirim ke semua WS milik user)
+            asyncio.run_coroutine_threadsafe(
+                send_bot_response(username, payload),
+                mqtt_loop
+            )
+        except Exception as e:
+            print(f"[WebProxy] Gagal parse Bot Response: {e}")
+        return
+
     # Cek apakah ini pesan chat room: chat/room/<room_name>
     if topic.startswith("chat/room/"):
         room = topic.split("/")[-1]
@@ -171,8 +202,28 @@ def on_mqtt_message(client, userdata, msg):
         except Exception as e:
             print(f"[WebProxy] Gagal parse MQTT message: {e}")
 
+async def send_bot_response(username, payload):
+    # Cari semua WS yang dimiliki oleh username ini dan kirim balasan
+    for ws, info in manager.ws_info.items():
+        if info["username"] == username:
+            try:
+                await ws.send_json(payload)
+            except:
+                pass
+
 # Inisialisasi MQTT v5
-mqtt_client = mqtt.Client(protocol=mqtt.MQTTv5)
+mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, protocol=mqtt.MQTTv5)
+
+# Last Will Testament (LWT) - Orang 3
+lwt_props = Properties(PacketTypes.WILLMESSAGE)
+lwt_props.MessageExpiryInterval = 3600 # 1 Jam
+mqtt_client.will_set("alert/system", json.dumps({
+    "type": "server_alert",
+    "level": "danger",
+    "message": "🚨 Proxy Server Terputus! Coba muat ulang halaman.",
+    "timestamp": "LWT"
+}), qos=1, retain=True, properties=lwt_props)
+
 mqtt_client.on_connect = on_mqtt_connect
 mqtt_client.on_message = on_mqtt_message
 
@@ -647,6 +698,10 @@ async def websocket_chat(
     })
     mqtt_client.publish(f"chat/room/{room}", join_payload, properties=join_props)
 
+    # Subscribe ke topic response bot (Orang 3)
+    response_topic = f"chat/response/{username}"
+    mqtt_client.subscribe(response_topic)
+
     # Notifikasi join ke room — termasuk daftar user online terkini
     await manager.broadcast_to_room(room, {
         "type":         "system",
@@ -693,10 +748,41 @@ async def websocket_chat(
 
             # ── Publish pesan via MQTT (dengan Topic Alias & User Properties) ──
             global next_alias_id
+            
+            # Ambil opsi MQTT dari frontend (QoS, Retain, Expiry, Bot Command)
+            qos = int(msg_dict.get("qos", 0))
+            retain = bool(msg_dict.get("retain", False))
+            expiry = msg_dict.get("expiry", 0) # dalam detik, 0 = no expiry
+            
+            # ── Request-Response Bot (Orang 3) ──
+            if text.startswith("/bot "):
+                command = text[5:].strip()
+                bot_req_topic = "chat/request/bot"
+                bot_res_topic = f"chat/response/{username}"
+                
+                req_props = Properties(PacketTypes.PUBLISH)
+                req_props.ResponseTopic = bot_res_topic
+                req_props.UserProperty = [("user_id", username)]
+                
+                payload = json.dumps({"command": command, "user_id": username})
+                mqtt_client.publish(bot_req_topic, payload, qos=1, properties=req_props)
+                
+                # Kasih feedback sementara ke user di room
+                await manager.send_to_ws(ws, {
+                    "type": "system",
+                    "message": f"⏳ Sedang meminta bot untuk perintah: '{command}'...",
+                    "timestamp": timestamp
+                })
+                continue
+
             topic = f"chat/room/{room}"
             
             publish_props = Properties(PacketTypes.PUBLISH)
             publish_props.UserProperty = [("username", username), ("msg_type", msg_type)]
+            
+            # Fitur Message Expiry (Orang 3)
+            if expiry > 0:
+                publish_props.MessageExpiryInterval = int(expiry)
             
             # Gunakan Topic Alias jika tersedia
             if topic in topic_aliases:
@@ -713,10 +799,11 @@ async def websocket_chat(
                 "timestamp": timestamp,
                 "type": msg_type,
                 "username": username,
-                "room": room
+                "room": room,
+                "is_pin": retain # Tandai sebagai pesan pinned
             })
             
-            mqtt_client.publish(publish_topic, payload, properties=publish_props)
+            mqtt_client.publish(publish_topic, payload, qos=qos, retain=retain, properties=publish_props)
 
     except WebSocketDisconnect:
         print(f"[WebProxy] WebSocket disconnected: {username} @ {room}")

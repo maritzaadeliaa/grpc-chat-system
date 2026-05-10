@@ -16,3 +16,57 @@
 1778406602: New connection from 172.19.0.1:49412 on port 1883.
 1778406602: New client connected from 172.19.0.1:49412 as auto-7A9498D1-1C32-704A-17D2-524B69F5F360 (p5, c1, k60).
 1778406916: Client auto-7A9498D1-1C32-704A-17D2-524B69F5F360 [172.19.0.1:49412] disconnected: connection closed by client.
+1778426956: mosquitto version 2.1.2 starting
+1778426956: Config loaded from /mosquitto/config/mosquitto.conf.
+1778426956: Bridge support available.
+1778426956: Persistence support available.
+1778426956: TLS support available.
+1778426956: TLS-PSK support available.
+1778426956: Websockets support available.
+1778426956: Opening ipv4 listen socket on port 1883.
+1778426956: Opening ipv6 listen socket on port 1883.
+1778426956: Opening ipv4 listen socket on port 9001.
+1778426956: Opening ipv6 listen socket on port 9001.
+1778426956: mosquitto version 2.1.2 running
+1778428539: New connection from 172.18.0.1:39258 on port 1883.
+1778428539: New client connected from 172.18.0.1:39258 as auto-474ECCE9-298B-E767-57AC-E0651ED484F3 (p5, c1, k60).
+1778428543: New connection from 172.18.0.1:59862 on port 1883.
+1778428543: New client connected from 172.18.0.1:59862 as auto-5C7A1C42-38DC-9D2F-2706-38D5205ECBDC (p5, c1, k60).
+1778428625: Client auto-474ECCE9-298B-E767-57AC-E0651ED484F3 [172.18.0.1:39258] disconnected: connection closed by client.
+1778428625: Client auto-5C7A1C42-38DC-9D2F-2706-38D5205ECBDC [172.18.0.1:59862] disconnected: connection closed by client.
+1778428756: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1778428845: New connection from 172.18.0.1:46594 on port 1883.
+1778428845: New client connected from 172.18.0.1:46594 as auto-7B9EAD5C-B408-67CE-E122-CCC3450DBA93 (p5, c1, k60).
+1778428848: New connection from 172.18.0.1:46610 on port 1883.
+1778428848: New client connected from 172.18.0.1:46610 as auto-8BBFAE6E-1DDE-9C4A-DEFF-39A41C97AD6B (p5, c1, k60).
+1778429710: New connection from 172.18.0.1:50752 on port 9001.
+1778429710: New connection from 172.18.0.1:50768 on port 9001.
+1778429710: Client 172.18.0.1 [172.18.0.1:50752] disconnected: bad socket read/write: Unknown error
+1778429711: Client 172.18.0.1 [172.18.0.1:50768] disconnected: bad socket read/write: Unknown error
+1778429711: New connection from 172.18.0.1:42040 on port 9001.
+1778429711: Client 172.18.0.1 [172.18.0.1:42040] disconnected: bad socket read/write: Unknown error
+1778429711: New connection from 172.18.0.1:42042 on port 9001.
+1778429712: Client 172.18.0.1 [172.18.0.1:42042] disconnected: bad socket read/write: Unknown error
+1778429712: New connection from 172.18.0.1:42046 on port 9001.
+1778429712: Client 172.18.0.1 [172.18.0.1:42046] disconnected: bad socket read/write: Unknown error
+1778429712: New connection from 172.18.0.1:42060 on port 9001.
+1778429712: Client 172.18.0.1 [172.18.0.1:42060] disconnected: bad socket read/write: Unknown error
+1778429720: New connection from 172.18.0.1:43526 on port 1883.
+1778429720: Protocol error from 172.18.0.1:43526: First packet not CONNECT (47).
+1778429720: Client 172.18.0.1 [172.18.0.1:43526] disconnected: protocol error.
+1778429720: New connection from 172.18.0.1:43538 on port 1883.
+1778429721: Protocol error from 172.18.0.1:43538: First packet not CONNECT (47).
+1778429721: Client 172.18.0.1 [172.18.0.1:43538] disconnected: protocol error.
+1778429721: New connection from 172.18.0.1:42928 on port 1883.
+1778429721: Protocol error from 172.18.0.1:42928: First packet not CONNECT (47).
+1778429721: Client 172.18.0.1 [172.18.0.1:42928] disconnected: protocol error.
+1778429721: New connection from 172.18.0.1:42930 on port 1883.
+1778429721: Protocol error from 172.18.0.1:42930: First packet not CONNECT (47).
+1778429721: Client 172.18.0.1 [172.18.0.1:42930] disconnected: protocol error.
+1778429723: New connection from 172.18.0.1:42940 on port 1883.
+1778429723: Protocol error from 172.18.0.1:42940: First packet not CONNECT (47).
+1778429723: Client 172.18.0.1 [172.18.0.1:42940] disconnected: protocol error.
+1778429723: New connection from 172.18.0.1:42942 on port 1883.
+1778429723: New connection from 172.18.0.1:42946 on port 1883.
+1778429754: Client 172.18.0.1 [172.18.0.1:42942] disconnected: exceeded timeout.
+1778429754: Client 172.18.0.1 [172.18.0.1:42946] disconnected: exceeded timeout.
