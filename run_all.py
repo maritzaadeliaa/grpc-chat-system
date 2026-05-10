@@ -26,12 +26,12 @@ SERVICES = [
         "port": 50053,
         "color": "\033[33m",  # Yellow
     },
-    {
-        "name": "Chat Service",
-        "cmd": [sys.executable, "-m", "server.chat_service.chat_server"],
-        "port": 50054,
-        "color": "\033[35m",  # Magenta
-    },
+    # {
+    #     "name": "Chat Service",
+    #     "cmd": [sys.executable, "-m", "server.chat_service.chat_server"],
+    #     "port": 50054,
+    #     "color": "\033[35m",  # Magenta
+    # },
     {
         "name": "Web Proxy",
         "cmd": [sys.executable, "-m", "uvicorn", "web_proxy:app",
@@ -102,7 +102,7 @@ def start_all():
 
     print(f"\n{BOLD}{'-' * 55}{RESET}")
     print(f"{BOLD}  Web UI  : http://localhost:8000{RESET}")
-    print(f"{BOLD}  Chat    : gRPC @ localhost:50054{RESET}")
+    print(f"{BOLD}  Chat    : MQTT @ localhost:1883{RESET}")
     print(f"{BOLD}  User    : gRPC @ localhost:50052{RESET}")
     print(f"{BOLD}  Room    : gRPC @ localhost:50053{RESET}")
     print(f"{BOLD}{'-' * 55}{RESET}")

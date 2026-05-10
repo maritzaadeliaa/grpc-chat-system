@@ -123,3 +123,32 @@ grpc-chat-system/
 
 **Oryza Qiara Ramadhani - 084**  
 **Maritza Adelia Sucipto - 111**
+
+---
+
+## 📡 Tugas Orang 1: Fondasi MQTT & Web Proxy Bridge
+
+Bagian ini merupakan tugas "Orang 1" dalam mengintegrasikan sistem dengan MQTT sebagai pengganti gRPC streaming utama untuk fitur chat.
+
+### Fitur yang Diimplementasikan (Orang 1):
+1. **MQTT Broker Setup**: Menggunakan Eclipse Mosquitto dengan konfigurasi `docker-compose.yml`.
+2. **Web Proxy MQTT Bridge**: Menghapus koneksi gRPC `ChatService` di Web Proxy dan menggantinya dengan inisiasi MQTT Client (`paho-mqtt` v5) yang menjembatani koneksi WebSocket ke MQTT secara asinkron (Pub/Sub).
+3. **Topic Alias**: Mengaktifkan fitur Topic Alias pada MQTT v5 untuk menghemat bandwidth (proxy tidak mengirim string topik secara berulang).
+4. **User Properties**: Metadata seperti `username` dan `msg_type` ("join", "message") tidak lagi diletakkan dalam payload JSON, melainkan disisipkan pada header spesifik (User Properties) MQTT v5.
+
+### Cara Menjalankan (Step-by-Step):
+1. Pastikan **Docker** sudah terinstal dan berjalan.
+2. Nyalakan broker MQTT (Mosquitto) melalui terminal:
+   ```bash
+   docker-compose up -d
+   ```
+3. Install modul MQTT Python:
+   ```bash
+   pip install paho-mqtt
+   ```
+4. Jalankan sistem (User Service, Room Service, & Web Proxy):
+   ```bash
+   python run_all.py
+   ```
+5. Buka web UI di browser: **http://localhost:8000**
+6. Untuk menguji: Buka 2 tab/browser berbeda, login dengan user yang berbeda, lalu masuk ke nama room yang sama. Coba mengirim pesan untuk membuktikan MQTT bridge berjalan sempurna.

@@ -531,6 +531,8 @@ function renderMessage(msg){
     scrollBottom(); return;
   }
 
+  if(msg.type==='join') return;
+
   // Normal chat
   const el=document.createElement('div');
   el.className=`msg-wrapper${isSelf?' self':''}`;

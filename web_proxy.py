@@ -36,8 +36,9 @@ import user_pb2
 import user_pb2_grpc
 import room_pb2
 import room_pb2_grpc
-import chat_pb2
-import chat_pb2_grpc
+import paho.mqtt.client as mqtt
+from paho.mqtt.properties import Properties
+from paho.mqtt.packettypes import PacketTypes
 
 app = FastAPI(title="gRPC Chat System - Web Proxy")
 
@@ -118,8 +119,66 @@ user_stub     = user_pb2_grpc.UserServiceStub(user_channel)
 room_channel  = grpc.insecure_channel('localhost:50053')
 room_stub     = room_pb2_grpc.RoomServiceStub(room_channel)
 
-chat_channel  = grpc.insecure_channel('localhost:50054')
-chat_stub     = chat_pb2_grpc.ChatServiceStub(chat_channel)
+# ─── MQTT Client Setup ────────────────────────────────────────────────────────
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+
+# Dictionary to track subscribed rooms to avoid duplicate subscriptions
+subscribed_rooms: Set[str] = set()
+mqtt_loop: asyncio.AbstractEventLoop = None
+
+def on_mqtt_connect(client, userdata, flags, rc, properties=None):
+    if rc == 0:
+        print("[WebProxy] Terhubung ke MQTT Broker!")
+        # Re-subscribe ke semua room aktif jika reconnect
+        for room in subscribed_rooms:
+            client.subscribe(f"chat/room/{room}")
+    else:
+        print(f"[WebProxy] Gagal connect MQTT, rc={rc}")
+
+def on_mqtt_message(client, userdata, msg):
+    """
+    Callback saat pesan MQTT diterima.
+    Berjalan di thread paho-mqtt, sehingga perlu dipush ke asyncio loop.
+    """
+    if mqtt_loop is None:
+        return
+        
+    topic = msg.topic
+    # Cek apakah ini pesan chat room: chat/room/<room_name>
+    if topic.startswith("chat/room/"):
+        room = topic.split("/")[-1]
+        
+        # Ambil User Properties jika ada (MQTT v5)
+        props = getattr(msg, "properties", None)
+        user_props = {}
+        if props and hasattr(props, "UserProperty"):
+            user_props = dict(props.UserProperty)
+            
+        # Parse payload
+        try:
+            payload = json.loads(msg.payload.decode())
+            # Jika user properties tersedia, kita override nilai di payload (membuktikan fitur jalan)
+            if "username" in user_props:
+                payload["username"] = user_props["username"]
+            if "msg_type" in user_props:
+                payload["type"] = user_props["msg_type"]
+                
+            asyncio.run_coroutine_threadsafe(
+                manager.broadcast_to_room(room, payload),
+                mqtt_loop
+            )
+        except Exception as e:
+            print(f"[WebProxy] Gagal parse MQTT message: {e}")
+
+# Inisialisasi MQTT v5
+mqtt_client = mqtt.Client(protocol=mqtt.MQTTv5)
+mqtt_client.on_connect = on_mqtt_connect
+mqtt_client.on_message = on_mqtt_message
+
+# Dictionary untuk Topic Alias (menghemat bandwidth)
+topic_aliases = {}
+next_alias_id = 1
 
 
 # ─── Connection Manager ───────────────────────────────────────────────────────
@@ -287,6 +346,16 @@ async def server_metrics_broadcaster():
 @app.on_event("startup")
 async def startup_event():
     """Jalankan background task saat server startup."""
+    global mqtt_loop
+    mqtt_loop = asyncio.get_event_loop()
+    
+    # Konek ke MQTT Broker (asinkron di background thread)
+    try:
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        mqtt_client.loop_start()
+    except Exception as e:
+        print(f"[WebProxy] PERINGATAN: Gagal connect ke MQTT Broker: {e}")
+
     asyncio.create_task(server_metrics_broadcaster())
     print("[WebProxy] Server-Initiated Events broadcaster started.")
 
@@ -428,17 +497,17 @@ async def handle_command(ws: WebSocket, username: str, room: str, command: str, 
             services = [
                 ("UserService  (port 50052)", user_stub.Login,          user_pb2.UserRequest(username="_ping_")),
                 ("RoomService  (port 50053)", room_stub.GetRoomMembers, room_pb2.RoomRequest(username="_ping_", room="_ping_")),
-                ("ChatService  (port 50054)", None,                     None),
+                ("ChatService  (MQTT Broker)", None,                     None),
             ]
             results = []
             for svc_name, method, req in services:
                 if method is None:
-                    # ChatService: buat koneksi sementara untuk cek ping
+                    # Cek koneksi broker
                     try:
-                        test_ch = grpc.insecure_channel('localhost:50054')
-                        grpc.channel_ready_future(test_ch).result(timeout=2)
-                        test_ch.close()
-                        results.append(f"✅ {svc_name}: ONLINE")
+                        if mqtt_client.is_connected():
+                            results.append(f"✅ {svc_name}: ONLINE")
+                        else:
+                            results.append(f"❌ {svc_name}: OFFLINE")
                     except Exception:
                         results.append(f"❌ {svc_name}: OFFLINE atau tidak merespons")
                 else:
@@ -561,68 +630,22 @@ async def websocket_chat(
     await manager.connect(ws, username, room)
     print(f"[WebProxy] WebSocket connected: {username} @ {room}")
 
-    send_queue = queue.Queue()
-    stop_event = threading.Event()
+    # ── Subscribe MQTT ke Room (Jika Belum) ──────────────────────────────
+    if room not in subscribed_rooms:
+        subscribed_rooms.add(room)
+        mqtt_client.subscribe(f"chat/room/{room}")
+        print(f"[WebProxy] Subscribed ke MQTT topic: chat/room/{room}")
 
-    def grpc_message_generator():
-        while not stop_event.is_set():
-            try:
-                msg = send_queue.get(timeout=1.0)
-                if msg is None:
-                    return
-                yield msg
-            except queue.Empty:
-                continue
-
-    loop = asyncio.get_event_loop()
-    grpc_error = [None]
-
-    def run_grpc_stream():
-        """
-        Thread terpisah: menerima messages dari gRPC ChatStream dan
-        mem-forward-nya ke WebSocket pemilik stream ini.
-        Setiap user punya gRPC stream sendiri sehingga tidak perlu
-        re-broadcast di sini (chat server sudah mengurus distribusi).
-        """
-        try:
-            print(f"[WebProxy] Membuka gRPC stream untuk {username}...")
-            for response in chat_stub.ChatStream(grpc_message_generator()):
-                msg_data = {
-                    "type":      response.msg_type or "message",
-                    "username":  response.username,
-                    "room":      response.room,
-                    "message":   response.message,
-                    "timestamp": response.timestamp or datetime.now().strftime("%H:%M:%S"),
-                }
-                asyncio.run_coroutine_threadsafe(
-                    manager.send_to_ws(ws, msg_data),
-                    loop
-                )
-        except grpc.RpcError as e:
-            print(f"[WebProxy] gRPC Stream Error ({username}): {e.details()}")
-            # Kirim pesan error ke UI agar user tahu
-            error_msg = {
-                "type": "server_alert",
-                "level": "danger",
-                "message": f"❌ Koneksi Chat Server terputus: {e.details()}",
-                "timestamp": datetime.now().strftime("%H:%M:%S")
-            }
-            asyncio.run_coroutine_threadsafe(manager.send_to_ws(ws, error_msg), loop)
-        except Exception as e:
-            print(f"[WebProxy] Unexpected Error ({username}): {e}")
-        finally:
-            print(f"[WebProxy] gRPC stream ditutup untuk {username}")
-            stop_event.set()
-
-    grpc_thread = threading.Thread(target=run_grpc_stream, daemon=True)
-    grpc_thread.start()
-
-    # Kirim sinyal join ke gRPC agar segera didaftarkan
-    send_queue.put(chat_pb2.ChatMessage(
-        username=username,
-        room=room,
-        msg_type="join"
-    ))
+    # Kirim sinyal join ke MQTT (menggunakan User Properties MQTT v5)
+    join_props = Properties(PacketTypes.PUBLISH)
+    join_props.UserProperty = [("username", username), ("msg_type", "join")]
+    
+    join_payload = json.dumps({
+        "message": "", 
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        # username & msg_type sengaja dihapus dari payload untuk mendemokan User Properties
+    })
+    mqtt_client.publish(f"chat/room/{room}", join_payload, properties=join_props)
 
     # Notifikasi join ke room — termasuk daftar user online terkini
     await manager.broadcast_to_room(room, {
@@ -668,21 +691,39 @@ async def websocket_chat(
                     print(f"[RateLimit] ⚠ {username} blocked (spam)")
                     continue
 
-            send_queue.put(chat_pb2.ChatMessage(
-                username=username,
-                room=room,
-                message=text,
-                timestamp=timestamp,
-                msg_type=msg_type,
-            ))
+            # ── Publish pesan via MQTT (dengan Topic Alias & User Properties) ──
+            global next_alias_id
+            topic = f"chat/room/{room}"
+            
+            publish_props = Properties(PacketTypes.PUBLISH)
+            publish_props.UserProperty = [("username", username), ("msg_type", msg_type)]
+            
+            # Gunakan Topic Alias jika tersedia
+            if topic in topic_aliases:
+                publish_props.TopicAlias = topic_aliases[topic]
+                publish_topic = "" # Kosongkan string topik karena alias digunakan
+            else:
+                topic_aliases[topic] = next_alias_id
+                publish_props.TopicAlias = next_alias_id
+                publish_topic = topic
+                next_alias_id += 1
+
+            payload = json.dumps({
+                "message": text,
+                "timestamp": timestamp,
+                "type": msg_type,
+                "username": username,
+                "room": room
+            })
+            
+            mqtt_client.publish(publish_topic, payload, properties=publish_props)
 
     except WebSocketDisconnect:
         print(f"[WebProxy] WebSocket disconnected: {username} @ {room}")
     except Exception as e:
         print(f"[WebProxy] WebSocket error: {e}")
     finally:
-        stop_event.set()
-        send_queue.put(None)
+        # Cleanup WebSocket (tidak ada lagi queue untuk grpc thread)
         manager.disconnect(ws)
 
         await manager.broadcast_to_room(room, {
@@ -721,7 +762,7 @@ async def health():
     return {"status": "ok", "services": {
         "user":  "localhost:50052",
         "room":  "localhost:50053",
-        "chat":  "localhost:50054",
+        "chat":  "MQTT Broker @ localhost:1883",
         "proxy": "localhost:8000",
     }, "active_connections": manager.total_connections}
 

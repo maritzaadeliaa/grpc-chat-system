@@ -1,0 +1,12 @@
+1778406273: mosquitto version 2.1.2 starting
+1778406273: Config loaded from /mosquitto/config/mosquitto.conf.
+1778406273: Bridge support available.
+1778406273: Persistence support available.
+1778406273: TLS support available.
+1778406273: TLS-PSK support available.
+1778406273: Websockets support available.
+1778406273: Opening ipv4 listen socket on port 1883.
+1778406273: Opening ipv6 listen socket on port 1883.
+1778406273: Opening ipv4 listen socket on port 9001.
+1778406273: Opening ipv6 listen socket on port 9001.
+1778406273: mosquitto version 2.1.2 running

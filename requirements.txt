@@ -4,3 +4,4 @@ fastapi
 uvicorn[standard]
 websockets
 python-jose[cryptography]
+paho-mqtt>=2.1.0
