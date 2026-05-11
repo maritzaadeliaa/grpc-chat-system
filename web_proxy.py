@@ -127,11 +127,26 @@ MQTT_PORT = 1883
 subscribed_rooms: Set[str] = set()
 mqtt_loop: asyncio.AbstractEventLoop = None
 
+retained_messages: Dict[str, dict] = {}
+sys_metrics: Dict[str, str] = {}
+dashboard_clients: Set[WebSocket] = set()
+
+async def notify_dashboards(payload: dict):
+    dead = []
+    for ws in list(dashboard_clients):
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        dashboard_clients.discard(ws)
+
 def on_mqtt_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         print("[WebProxy] Terhubung ke MQTT Broker!")
-        # Subscribe ke topic LWT (Orang 3)
+        # Subscribe ke topic LWT (Orang 3) dan SYS
         client.subscribe("alert/system")
+        client.subscribe("$SYS/#")
         
         # Re-subscribe ke semua room aktif jika reconnect
         for room in subscribed_rooms:
@@ -148,6 +163,14 @@ def on_mqtt_message(client, userdata, msg):
         return
         
     topic = msg.topic
+    
+    # ── Broker Metrics (SYS) ──
+    if topic.startswith("$SYS/"):
+        try:
+            sys_metrics[topic] = msg.payload.decode()
+        except:
+            pass
+        return
     
     # ── LWT Alert (Orang 3) ──
     if topic == "alert/system":
@@ -195,8 +218,25 @@ def on_mqtt_message(client, userdata, msg):
             if "msg_type" in user_props:
                 payload["type"] = user_props["msg_type"]
                 
+            # Cache retained message
+            if payload.get("is_pin") or msg.retain:
+                if payload.get("message") == "" and payload.get("type") != "join":
+                    retained_messages.pop(room, None)
+                else:
+                    payload["is_pin"] = True
+                    payload["_cached_at"] = time.time()
+                    retained_messages[room] = payload
+                
             asyncio.run_coroutine_threadsafe(
                 manager.broadcast_to_room(room, payload),
+                mqtt_loop
+            )
+            
+            # Broadcast log to dashboards
+            dash_payload = dict(payload)
+            dash_payload["_dash_type"] = "chat_log"
+            asyncio.run_coroutine_threadsafe(
+                notify_dashboards(dash_payload),
                 mqtt_loop
             )
         except Exception as e:
@@ -311,28 +351,33 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+qos_stats = {0: 0, 1: 0, 2: 0}
 
 
 # ─── Server-Initiated Events: Background Metrics Broadcaster ──────────────────
-# Variabel simulasi agar grafik terasa hidup
-_cpu_base  = random.uniform(20, 50)
-_mem_base  = random.uniform(30, 60)
-
-# Cooldown untuk CPU alert agar tidak spam
+# Cooldown untuk CPU alert agar tidak spam (tidak relevan lagi tapi dibiarkan strukturnya)
 _last_cpu_alert = 0
 _CPU_ALERT_COOLDOWN = 300  # 5 menit (agar tidak mengganggu chat)
 
-def _simulate_metrics() -> dict:
-    """Menghasilkan data metrics server yang bervariasi secara simulasi."""
-    global _cpu_base, _mem_base
-    # Drift acak agar pergerakan lebih natural
-    _cpu_base = max(5,  min(85,  _cpu_base  + random.uniform(-5, 5)))
-    _mem_base = max(10, min(80,  _mem_base  + random.uniform(-2, 3)))
+def _get_mqtt_metrics() -> dict:
+    """Mengambil data statistik QoS asli dan metrik sistem Broker."""
+    # Garbage collect expired retained messages
+    now = time.time()
+    for r in list(retained_messages.keys()):
+        rm = retained_messages[r]
+        exp = int(rm.get("expiry", 0))
+        if exp > 0 and (now - rm.get("_cached_at", 0)) >= exp:
+            del retained_messages[r]
+            
     return {
-        "cpu":         round(_cpu_base  + random.uniform(-3, 3), 1),
-        "memory":      round(_mem_base  + random.uniform(-1, 1), 1),
+        "qos0": qos_stats[0],
+        "qos1": qos_stats[1],
+        "qos2": qos_stats[2],
         "connections": manager.total_connections,
-        "uptime_s":    int(time.monotonic()),
+        "uptime_s": int(time.monotonic()),
+        "sys": sys_metrics,
+        "active_rooms": list(subscribed_rooms),
+        "retained_count": len(retained_messages)
     }
 
 
@@ -350,37 +395,28 @@ _alert_idx = 0
 async def server_metrics_broadcaster():
     """
     SERVER-INITIATED EVENTS — Background task yang berjalan selamanya.
-    Setiap 5 detik mem-push data metrics ke semua browser tanpa diminta klien.
-    Setiap ~30 detik mengirim system alert acak (maintenance notice, ping, dll).
-    Ini adalah contoh server proaktif mendorong data tanpa request dari klien.
+    Setiap 2 detik mem-push data metrics ke semua browser tanpa diminta klien.
     """
     global _alert_idx, _last_cpu_alert
     tick = 0
     while True:
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
         if manager.total_connections == 0:
             continue
 
-        metrics = _simulate_metrics()
-        tick += 5
+        metrics = _get_mqtt_metrics()
+        tick += 2
 
-        # Kirim paket server_metric ke semua klien setiap 5 detik
+
+        # Kirim paket server_metric ke semua klien setiap 2 detik
         await manager.broadcast_to_all({
             "type":      "server_metric",
             "data":      metrics,
             "timestamp": datetime.now().strftime("%H:%M:%S"),
         })
 
-        # ── Server-Initiated Alert: threshold CPU dengan cooldown 5 menit ──
+        # ── Server-Initiated Alert: (Diabaikan untuk metrics dashboard asli) ──
         now = time.monotonic()
-        if metrics["cpu"] > 85 and (now - _last_cpu_alert) > _CPU_ALERT_COOLDOWN:
-            _last_cpu_alert = now
-            await manager.broadcast_to_all({
-                "type":    "server_alert",
-                "level":   "danger",
-                "message": f"🚨 CPU Usage kritis: {metrics['cpu']}%! Server sedang bekerja keras.",
-                "timestamp": datetime.now().strftime("%H:%M:%S"),
-            })
 
         # ── Server-Initiated Alert: periodic system notices (~60 detik sekali) ──
         if tick % 60 == 0:
@@ -681,6 +717,15 @@ async def websocket_chat(
     await manager.connect(ws, username, room)
     print(f"[WebProxy] WebSocket connected: {username} @ {room}")
 
+    # Kirim retained message ke user baru jika ada
+    if room in retained_messages:
+        rm = retained_messages[room]
+        exp = int(rm.get("expiry", 0))
+        if exp > 0 and (time.time() - rm.get("_cached_at", 0)) >= exp:
+            del retained_messages[room]
+        else:
+            await manager.send_to_ws(ws, rm)
+
     # ── Subscribe MQTT ke Room (Jika Belum) ──────────────────────────────
     if room not in subscribed_rooms:
         subscribed_rooms.add(room)
@@ -754,6 +799,12 @@ async def websocket_chat(
             retain = bool(msg_dict.get("retain", False))
             expiry = msg_dict.get("expiry", 0) # dalam detik, 0 = no expiry
             
+            # --- Rekam metrik QoS (jika ini pesan chat biasa, bukan typing dll) ---
+            if msg_type == "message" and not text.startswith("/bot "):
+                if qos in qos_stats:
+                    qos_stats[qos] += 1
+            # ----------------------------------------------------------------------
+            
             # ── Request-Response Bot (Orang 3) ──
             if text.startswith("/bot "):
                 command = text[5:].strip()
@@ -800,7 +851,8 @@ async def websocket_chat(
                 "type": msg_type,
                 "username": username,
                 "room": room,
-                "is_pin": retain # Tandai sebagai pesan pinned
+                "is_pin": retain, # Tandai sebagai pesan pinned
+                "expiry": expiry
             })
             
             mqtt_client.publish(publish_topic, payload, qos=qos, retain=retain, properties=publish_props)
@@ -843,6 +895,27 @@ async def root():
             return HTMLResponse(content=f.read())
     return HTMLResponse(content="<h1>Web UI not found</h1>")
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page():
+    """Serve Dashboard Web UI."""
+    html_path = os.path.join(os.path.dirname(__file__), "web", "dashboard.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Dashboard not found</h1>")
+
+@app.websocket("/ws/dashboard")
+async def websocket_dashboard(ws: WebSocket):
+    """Endpoint untuk dashboard menerima broadcast metrik tanpa auth."""
+    await ws.accept()
+    manager.all_ws.add(ws)
+    dashboard_clients.add(ws)
+    try:
+        while True:
+            await ws.receive_text()
+    except Exception:
+        manager.all_ws.discard(ws)
+        dashboard_clients.discard(ws)
 
 @app.get("/health")
 async def health():

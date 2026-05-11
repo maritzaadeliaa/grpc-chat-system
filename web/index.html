@@ -311,16 +311,20 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);height
     <!-- SERVER MONITOR — Event-Driven Component #1 -->
     <div class="monitor-section">
       <div class="monitor-header">
-        <div class="section-title">📡 Server Monitor</div>
+        <div class="section-title">📡 MQTT Dashboard</div>
         <div class="server-live-dot" id="monitor-live-dot" style="display:none"></div>
       </div>
       <div class="metric-row">
-        <div class="metric-label"><span>CPU</span><span class="val" id="cpu-val">–%</span></div>
-        <div class="metric-bar"><div class="metric-fill ok" id="cpu-bar"></div></div>
+        <div class="metric-label"><span>QoS 0 Sent</span><span class="val" id="qos0-val">0</span></div>
+        <div class="metric-bar"><div class="metric-fill ok" id="qos0-bar" style="width:0%; background:var(--ok)"></div></div>
       </div>
       <div class="metric-row">
-        <div class="metric-label"><span>Memory</span><span class="val" id="mem-val">–%</span></div>
-        <div class="metric-bar"><div class="metric-fill ok" id="mem-bar"></div></div>
+        <div class="metric-label"><span>QoS 1 Sent</span><span class="val" id="qos1-val">0</span></div>
+        <div class="metric-bar"><div class="metric-fill warn" id="qos1-bar" style="width:0%; background:var(--warn)"></div></div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-label"><span>QoS 2 Sent</span><span class="val" id="qos2-val">0</span></div>
+        <div class="metric-bar"><div class="metric-fill danger" id="qos2-bar" style="width:0%; background:var(--danger)"></div></div>
       </div>
       <div class="conn-count">Koneksi aktif: <span id="conn-count-val">–</span></div>
     </div>
@@ -506,15 +510,18 @@ function renderOnlineUsers(users) {
 
 function updateMonitor(data){
   monitorLiveDot.style.display='block';
-  const {cpu, memory, connections} = data;
+  const {qos0, qos1, qos2, connections} = data;
 
-  const cpuBar=$('cpu-bar'); $('cpu-val').textContent=cpu+'%';
-  cpuBar.style.width=cpu+'%';
-  cpuBar.className='metric-fill '+(cpu>80?'danger':cpu>60?'warn':'ok');
-
-  const memBar=$('mem-bar'); $('mem-val').textContent=memory+'%';
-  memBar.style.width=memory+'%';
-  memBar.className='metric-fill '+(memory>80?'danger':memory>60?'warn':'ok');
+  const total = (qos0 + qos1 + qos2) || 1; // hindari division by zero
+  
+  $('qos0-val').textContent = qos0;
+  $('qos0-bar').style.width = Math.min(100, (qos0/total)*100) + '%';
+  
+  $('qos1-val').textContent = qos1;
+  $('qos1-bar').style.width = Math.min(100, (qos1/total)*100) + '%';
+  
+  $('qos2-val').textContent = qos2;
+  $('qos2-bar').style.width = Math.min(100, (qos2/total)*100) + '%';
 
   $('conn-count-val').textContent=connections;
 }
@@ -569,6 +576,27 @@ function renderMessage(msg){
     </div>`;
   msgsCont.appendChild(el);
   scrollBottom();
+  
+  // ── Self-Destruct Visual Effect (Frontend) ──
+  if (msg.expiry && parseInt(msg.expiry) > 0) {
+    const expSec = parseInt(msg.expiry);
+    const timeEl = el.querySelector('.msg-time');
+    let timeLeft = expSec;
+    timeEl.innerHTML = `<span style="color:#ff5f7e;font-weight:bold">⏱️ ${timeLeft}s</span>`;
+    
+    const interval = setInterval(() => {
+      timeLeft--;
+      if (timeLeft <= 0) clearInterval(interval);
+      else timeEl.innerHTML = `<span style="color:#ff5f7e;font-weight:bold">⏱️ ${timeLeft}s</span>`;
+    }, 1000);
+
+    setTimeout(() => {
+      el.style.transition = "all 0.5s ease";
+      el.style.opacity = "0";
+      el.style.transform = "scale(0.8)";
+      setTimeout(() => { if (el.parentNode) el.remove(); }, 500);
+    }, expSec * 1000);
+  }
 }
 
 // ── Room List ──────────────────────────────────────────────────────────────

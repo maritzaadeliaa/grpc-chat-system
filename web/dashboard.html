@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT v5 Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d0f14;
+            color: #e8eaf6;
+            padding: 30px;
+            overflow-x: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 15px;
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6c63ff, #2dd4a0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .conn-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            background: rgba(45, 212, 160, 0.1);
+            border: 1px solid rgba(45, 212, 160, 0.3);
+            padding: 8px 16px;
+            border-radius: 99px;
+            color: #2dd4a0;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: #2dd4a0; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(45, 212, 160, 0.4); } 50% { opacity: 0.7; box-shadow: 0 0 0 6px transparent; } }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 20px;
+        }
+        .card {
+            background: #13161e;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+        }
+        .card-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8892b0;
+            margin-bottom: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ── Kpis ── */
+        .kpi { grid-column: span 3; }
+        .kpi .value { font-size: 32px; font-weight: 700; color: #fff; margin-bottom: 5px; }
+        .kpi .sub { font-size: 12px; color: #4a5568; }
+
+        /* ── QoS Analytics ── */
+        .qos-panel { grid-column: span 4; }
+        .qos-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .qos-label { font-size: 14px; font-weight: 600; width: 60px; }
+        .qos-bar-bg { flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 99px; overflow: hidden; margin: 0 15px; }
+        .qos-bar-fill { height: 100%; width: 0%; transition: width 0.5s ease; }
+        .qos-count { font-size: 14px; font-weight: 700; width: 40px; text-align: right; }
+
+        /* ── Broker Stats ── */
+        .broker-panel { grid-column: span 8; }
+        .broker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .b-stat { background: #1a1f2e; padding: 15px; border-radius: 12px; text-align: center; }
+        .b-stat .val { font-size: 20px; font-weight: 700; color: #38bdf8; margin-bottom: 4px; }
+        .b-stat .lbl { font-size: 11px; color: #8892b0; }
+
+        /* ── Traffic Log ── */
+        .log-panel { grid-column: span 12; height: 300px; }
+        .log-container { flex: 1; background: #000; border-radius: 8px; padding: 15px; overflow-y: auto; font-family: monospace; font-size: 12px; line-height: 1.6; }
+        .log-entry { margin-bottom: 4px; }
+        .log-entry .time { color: #4a5568; margin-right: 10px; }
+        .log-entry.alert { color: #ff5f7e; }
+        .log-entry.metric { color: #2dd4a0; }
+
+        /* ── Lists ── */
+        .list-panel { grid-column: span 6; height: 250px; overflow-y: auto; }
+        .list-item { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .list-item:last-child { border-bottom: none; }
+        .badge { background: #6c63ff; color: #fff; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>MQTT v5 Command Center</h1>
+        <div class="conn-status" id="conn-status">
+            <div class="dot" id="conn-dot"></div>
+            <span id="conn-text">Connecting Proxy...</span>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- KPIs -->
+        <div class="card kpi">
+            <div class="card-title">🔌 Active WebSockets</div>
+            <div class="value" id="kpi-ws">0</div>
+            <div class="sub">Total pengguna terhubung ke Web Proxy</div>
+        </div>
+        <div class="card kpi">
+            <div class="card-title">📌 Pinned Messages</div>
+            <div class="value" id="kpi-pinned" style="color: #f0b429;">0</div>
+            <div class="sub">Pesan Retained tersimpan di Broker</div>
+        </div>
+        <div class="card kpi">
+            <div class="card-title">🏠 Active Rooms</div>
+            <div class="value" id="kpi-rooms" style="color: #2dd4a0;">0</div>
+            <div class="sub">Topik Chat yang disubscribe Proxy</div>
+        </div>
+        <div class="card kpi">
+            <div class="card-title">⏱️ Broker Uptime</div>
+            <div class="value" id="kpi-uptime" style="color: #38bdf8;">0s</div>
+            <div class="sub">Waktu aktif Mosquitto Broker</div>
+        </div>
+
+        <!-- QoS Analytics -->
+        <div class="card qos-panel">
+            <div class="card-title">📊 QoS Performance (Orang 3)</div>
+            <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+                <div class="qos-row">
+                    <div class="qos-label" style="color:#2dd4a0;">QoS 0</div>
+                    <div class="qos-bar-bg"><div class="qos-bar-fill" id="bar-qos0" style="background:#2dd4a0;"></div></div>
+                    <div class="qos-count" id="count-qos0">0</div>
+                </div>
+                <div class="qos-row">
+                    <div class="qos-label" style="color:#f0b429;">QoS 1</div>
+                    <div class="qos-bar-bg"><div class="qos-bar-fill" id="bar-qos1" style="background:#f0b429;"></div></div>
+                    <div class="qos-count" id="count-qos1">0</div>
+                </div>
+                <div class="qos-row">
+                    <div class="qos-label" style="color:#ff5f7e;">QoS 2</div>
+                    <div class="qos-bar-bg"><div class="qos-bar-fill" id="bar-qos2" style="background:#ff5f7e;"></div></div>
+                    <div class="qos-count" id="count-qos2">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Broker Stats -->
+        <div class="card broker-panel">
+            <div class="card-title">⚙️ Mosquitto Broker Internal Metrics ($SYS)</div>
+            <div class="broker-grid">
+                <div class="b-stat">
+                    <div class="val" id="b-clients-active">0</div>
+                    <div class="lbl">Active MQTT Clients</div>
+                </div>
+                <div class="b-stat">
+                    <div class="val" id="b-msg-sent">0</div>
+                    <div class="lbl">Total Messages Sent</div>
+                </div>
+                <div class="b-stat">
+                    <div class="val" id="b-msg-recv">0</div>
+                    <div class="lbl">Total Messages Received</div>
+                </div>
+                <div class="b-stat">
+                    <div class="val" id="b-msg-drop" style="color:#ff5f7e;">0</div>
+                    <div class="lbl">Dropped Messages</div>
+                </div>
+                <div class="b-stat">
+                    <div class="val" id="b-bytes-sent">0 KB</div>
+                    <div class="lbl">Bytes Sent</div>
+                </div>
+                <div class="b-stat">
+                    <div class="val" id="b-bytes-recv">0 KB</div>
+                    <div class="lbl">Bytes Received</div>
+                </div>
+                <div class="b-stat">
+                    <div class="val" id="b-heap">0 KB</div>
+                    <div class="lbl">Current Heap Size</div>
+                </div>
+                <div class="b-stat">
+                    <div class="val" id="b-subs">0</div>
+                    <div class="lbl">Total Subscriptions</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lists -->
+        <div class="card list-panel">
+            <div class="card-title">📝 Active Chat Rooms</div>
+            <div id="rooms-list" style="overflow-y:auto; flex:1;">
+                <div style="text-align:center; color:#4a5568; margin-top:20px;">Belum ada room aktif</div>
+            </div>
+        </div>
+
+        <div class="card list-panel">
+            <div class="card-title">🚨 System Alerts & LWT (Orang 3)</div>
+            <div id="alerts-list" style="overflow-y:auto; flex:1;"></div>
+        </div>
+
+        <!-- Traffic Log -->
+        <div class="card log-panel">
+            <div class="card-title">💻 Live Server Traffic Log</div>
+            <div class="log-container" id="log-container"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+
+        function logTraffic(msg, type='metric') {
+            const container = $('log-container');
+            const el = document.createElement('div');
+            el.className = `log-entry ${type}`;
+            const ts = new Date().toLocaleTimeString('id',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+            el.innerHTML = `<span class="time">[${ts}]</span> ${msg}`;
+            container.appendChild(el);
+            container.scrollTop = container.scrollHeight;
+            while(container.children.length > 50) {
+                container.removeChild(container.firstChild);
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes || isNaN(bytes)) return '0 KB';
+            return (bytes / 1024).toFixed(1) + ' KB';
+        }
+
+        function formatTime(secs) {
+            if (!secs || isNaN(secs)) return '0s';
+            let m = Math.floor(secs / 60);
+            let s = secs % 60;
+            return m > 0 ? `${m}m ${s}s` : `${s}s`;
+        }
+
+        function connectWS() {
+            const ws = new WebSocket(`ws://${window.location.host}/ws/dashboard`);
+            
+            ws.onopen = () => {
+                $('conn-text').textContent = 'Proxy Connected';
+                $('conn-dot').style.background = '#2dd4a0';
+                logTraffic('WebSocket terhubung ke Proxy Server.', 'metric');
+            };
+
+            ws.onclose = () => {
+                $('conn-text').textContent = 'Disconnected';
+                $('conn-dot').style.background = '#ff5f7e';
+                $('conn-dot').style.animation = 'none';
+                setTimeout(connectWS, 3000);
+            };
+
+            ws.onmessage = (e) => {
+                const msg = JSON.parse(e.data);
+
+                // Handle live chat traffic logs
+                if (msg._dash_type === 'chat_log') {
+                    if (msg.type === 'message') {
+                        let text = `💬 [Room: ${msg.room}] ${msg.username}: ${msg.message}`;
+                        if (msg.expiry > 0) text += ` (Expiry: ${msg.expiry}s)`;
+                        if (msg.is_pin) text += ` [PINNED]`;
+                        logTraffic(text, 'metric');
+                        
+                        // Simulate broker deletion in log
+                        if (msg.expiry && parseInt(msg.expiry) > 0) {
+                            setTimeout(() => {
+                                logTraffic(`🗑️ [EXPIRED] Pesan "${msg.message}" dari ${msg.username} di room ${msg.room} telah dihapus dari MQTT Broker.`, 'alert');
+                            }, parseInt(msg.expiry) * 1000);
+                        }
+                    }
+                    return;
+                }
+
+                if (msg.type === 'server_alert') {
+                    logTraffic(`ALERT: ${msg.message}`, 'alert');
+                    
+                    const alertsList = $('alerts-list');
+                    const el = document.createElement('div');
+                    el.className = 'list-item';
+                    const ts = new Date().toLocaleTimeString();
+                    el.innerHTML = `<span style="color:#ff5f7e; font-size:12px;">${msg.message}</span> <span class="badge" style="background:#4a5568;">${ts}</span>`;
+                    alertsList.prepend(el);
+                    if(alertsList.children.length > 10) alertsList.removeChild(alertsList.lastChild);
+                }
+                else if (msg.type === 'server_metric') {
+                    const data = msg.data;
+                    
+                    // KPIs
+                    $('kpi-ws').textContent = data.connections || 0;
+                    $('kpi-pinned').textContent = data.retained_count || 0;
+                    $('kpi-rooms').textContent = (data.active_rooms || []).length;
+                    
+                    // QoS
+                    const totalQos = (data.qos0 + data.qos1 + data.qos2) || 1;
+                    $('count-qos0').textContent = data.qos0;
+                    $('bar-qos0').style.width = Math.min(100, (data.qos0/totalQos)*100) + '%';
+                    $('count-qos1').textContent = data.qos1;
+                    $('bar-qos1').style.width = Math.min(100, (data.qos1/totalQos)*100) + '%';
+                    $('count-qos2').textContent = data.qos2;
+                    $('bar-qos2').style.width = Math.min(100, (data.qos2/totalQos)*100) + '%';
+
+                    // Rooms List
+                    const rList = $('rooms-list');
+                    if(data.active_rooms && data.active_rooms.length > 0) {
+                        rList.innerHTML = '';
+                        data.active_rooms.forEach(r => {
+                            rList.innerHTML += `<div class="list-item"><span># ${r}</span> <span class="badge">Active</span></div>`;
+                        });
+                    } else {
+                        rList.innerHTML = '<div style="text-align:center; color:#4a5568; margin-top:20px;">Belum ada room aktif</div>';
+                    }
+
+                    // Broker SYS Metrics
+                    if (data.sys) {
+                        const s = data.sys;
+                        $('kpi-uptime').textContent = formatTime(s['$SYS/broker/uptime'] ? parseInt(s['$SYS/broker/uptime']) : 0);
+                        
+                        $('b-clients-active').textContent = s['$SYS/broker/clients/active'] || 0;
+                        $('b-msg-sent').textContent = s['$SYS/broker/messages/sent'] || 0;
+                        $('b-msg-recv').textContent = s['$SYS/broker/messages/received'] || 0;
+                        $('b-msg-drop').textContent = s['$SYS/broker/publish/messages/dropped'] || 0;
+                        
+                        $('b-bytes-sent').textContent = formatBytes(parseInt(s['$SYS/broker/bytes/sent']));
+                        $('b-bytes-recv').textContent = formatBytes(parseInt(s['$SYS/broker/bytes/received']));
+                        $('b-heap').textContent = formatBytes(parseInt(s['$SYS/broker/heap/current']));
+                        $('b-subs').textContent = s['$SYS/broker/subscriptions/count'] || 0;
+                    }
+                }
+            };
+        }
+
+        // Init
+        connectWS();
+
+    </script>
+</body>
+</html>

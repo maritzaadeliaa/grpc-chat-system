@@ -70,3 +70,19 @@
 1778429723: New connection from 172.18.0.1:42946 on port 1883.
 1778429754: Client 172.18.0.1 [172.18.0.1:42942] disconnected: exceeded timeout.
 1778429754: Client 172.18.0.1 [172.18.0.1:42946] disconnected: exceeded timeout.
+1778462088: mosquitto version 2.1.2 starting
+1778462088: Config loaded from /mosquitto/config/mosquitto.conf.
+1778462088: Bridge support available.
+1778462088: Persistence support available.
+1778462088: TLS support available.
+1778462088: TLS-PSK support available.
+1778462088: Websockets support available.
+1778462088: Opening ipv4 listen socket on port 1883.
+1778462088: Opening ipv6 listen socket on port 1883.
+1778462088: Opening ipv4 listen socket on port 9001.
+1778462088: Opening ipv6 listen socket on port 9001.
+1778462088: mosquitto version 2.1.2 running
+1778462115: New connection from 172.19.0.1:55552 on port 1883.
+1778462115: New client connected from 172.19.0.1:55552 as auto-76E8E2CD-F175-2D1F-F347-FF28BC22DE37 (p5, c1, k60).
+1778462117: New connection from 172.19.0.1:55566 on port 1883.
+1778462117: New client connected from 172.19.0.1:55566 as auto-FC993E74-C492-59A7-A53C-AFDF7A6AB735 (p5, c1, k60).
