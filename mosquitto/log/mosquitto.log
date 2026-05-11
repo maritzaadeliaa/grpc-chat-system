@@ -86,3 +86,42 @@
 1778462115: New client connected from 172.19.0.1:55552 as auto-76E8E2CD-F175-2D1F-F347-FF28BC22DE37 (p5, c1, k60).
 1778462117: New connection from 172.19.0.1:55566 on port 1883.
 1778462117: New client connected from 172.19.0.1:55566 as auto-FC993E74-C492-59A7-A53C-AFDF7A6AB735 (p5, c1, k60).
+1778462755: Client auto-76E8E2CD-F175-2D1F-F347-FF28BC22DE37 [172.19.0.1:55552] disconnected: connection closed by client.
+1778462755: Client auto-FC993E74-C492-59A7-A53C-AFDF7A6AB735 [172.19.0.1:55566] disconnected: connection closed by client.
+1778462850: New connection from 172.19.0.1:38550 on port 1883.
+1778462850: New client connected from 172.19.0.1:38550 as auto-B0B244A3-3BC7-051B-6609-B75EDD24DB15 (p5, c1, k60).
+1778462852: New connection from 172.19.0.1:45640 on port 1883.
+1778462852: New client connected from 172.19.0.1:45640 as auto-9BC8CA17-0E22-20A9-1F12-18D02801DEA8 (p5, c1, k60).
+1778463113: New connection from 172.19.0.1:49314 on port 1883.
+1778463113: New client connected from 172.19.0.1:49314 as auto-9E7FF593-61BD-2CB8-541E-5B0668E5786B (p4, c1, k60).
+1778463115: Client auto-9E7FF593-61BD-2CB8-541E-5B0668E5786B [172.19.0.1:49314] disconnected: connection closed by client.
+1778463139: New connection from 172.19.0.1:45678 on port 1883.
+1778463139: New client connected from 172.19.0.1:45678 as auto-40578505-4823-7DA0-A994-8793121C9E6E (p4, c1, k60).
+1778463142: Client auto-B0B244A3-3BC7-051B-6609-B75EDD24DB15 [172.19.0.1:38550] disconnected: connection closed by client.
+1778463142: Client auto-9BC8CA17-0E22-20A9-1F12-18D02801DEA8 [172.19.0.1:45640] disconnected: connection closed by client.
+1778463142: Client auto-40578505-4823-7DA0-A994-8793121C9E6E [172.19.0.1:45678] disconnected.
+1778463313: New connection from 172.19.0.1:44616 on port 1883.
+1778463313: New client connected from 172.19.0.1:44616 as auto-967DC193-C291-C8DE-D9DB-377AD1807FCA (p5, c1, k60).
+1778463322: New connection from 172.19.0.1:42404 on port 1883.
+1778463322: New client connected from 172.19.0.1:42404 as auto-37FEB185-7B58-5C05-5E8B-F114C7F7EE01 (p5, c1, k60).
+1778463341: Client auto-967DC193-C291-C8DE-D9DB-377AD1807FCA [172.19.0.1:44616] disconnected: connection closed by client.
+1778463341: Client auto-37FEB185-7B58-5C05-5E8B-F114C7F7EE01 [172.19.0.1:42404] disconnected: connection closed by client.
+1778463530: New connection from 172.19.0.1:36188 on port 1883.
+1778463530: New client connected from 172.19.0.1:36188 as auto-E2A47E4D-95A6-4584-27BA-7E0183FE9F30 (p5, c1, k60).
+1778463532: New connection from 172.19.0.1:43712 on port 1883.
+1778463532: New client connected from 172.19.0.1:43712 as auto-99F90765-5E7F-240E-BCAD-86A61AB31974 (p5, c1, k60).
+1778463896: Client auto-E2A47E4D-95A6-4584-27BA-7E0183FE9F30 [172.19.0.1:36188] disconnected: connection closed by client.
+1778463896: Client auto-99F90765-5E7F-240E-BCAD-86A61AB31974 [172.19.0.1:43712] disconnected: connection closed by client.
+1778463902: New connection from 172.19.0.1:47366 on port 1883.
+1778463902: New client connected from 172.19.0.1:47366 as auto-69D34AD0-ECC7-8A14-FCCA-95948B26CEC2 (p5, c1, k60).
+1778463905: New connection from 172.19.0.1:47372 on port 1883.
+1778463905: New client connected from 172.19.0.1:47372 as auto-85C08273-0213-266E-D4D8-8F37E19A2D8F (p5, c1, k60).
+1778463938: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1778464282: Client auto-69D34AD0-ECC7-8A14-FCCA-95948B26CEC2 [172.19.0.1:47366] disconnected: connection closed by client.
+1778464282: Client auto-85C08273-0213-266E-D4D8-8F37E19A2D8F [172.19.0.1:47372] disconnected: connection closed by client.
+1778464377: New connection from 172.19.0.1:59412 on port 1883.
+1778464377: New client connected from 172.19.0.1:59412 as auto-DF5F6391-0FA1-4C4D-A96D-DD3372A0719B (p5, c1, k60).
+1778464379: New connection from 172.19.0.1:59420 on port 1883.
+1778464379: New client connected from 172.19.0.1:59420 as auto-09152C26-B1FB-DA6E-D92C-4DF4796E530E (p5, c1, k60).
+1778464505: Client auto-DF5F6391-0FA1-4C4D-A96D-DD3372A0719B [172.19.0.1:59412] disconnected: connection closed by client.
+1778464505: Client auto-09152C26-B1FB-DA6E-D92C-4DF4796E530E [172.19.0.1:59420] disconnected: connection closed by client.
