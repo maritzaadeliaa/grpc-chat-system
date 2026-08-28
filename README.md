@@ -4,6 +4,10 @@ Sistem ini adalah implementasi **Real-Time Chat** modern yang menggabungkan **gR
 
 ---
 
+## Demo
+
+[![TypeSense Demo](https://img.youtube.com/vi/WRqGBEfifrk/maxresdefault.jpg)](https://youtu.be/WRqGBEfifrk)
+
 ## 🏗️ Arsitektur Sistem Baru (MQTT Integration)
 
 Sistem telah bermigrasi dari gRPC Bidirectional Streaming menjadi model **Publish/Subscribe** menggunakan broker **Eclipse Mosquitto**.
